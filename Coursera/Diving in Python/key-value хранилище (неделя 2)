@@ -1,0 +1,54 @@
+"""
+На этой неделе мы с вами реализуем собственный key-value storage.
+Вашей задачей будет написать скрипт, который принимает в качестве аргументов ключи и значения и выводит информацию из хранилища (в нашем случае — из файла).
+Запись значения по ключу
+> storage.py --key key_name --val value
+Получение значения по ключу
+> storage.py --key key_name
+"""
+
+import argparse
+import json
+import os
+import tempfile
+
+storage_path = os.path.join(tempfile.gettempdir(), 'storage.data')
+
+def get_data():
+    """Получение данных из хранилища"""
+    if not os.path.exists(storage_path):  # если хранилище еще не создано
+        return dict()
+
+    with open(storage_path, 'r') as f:
+        my_data = f.read()
+        if my_data:  # если есть данные, возращаем объект python
+            return json.loads(my_data)
+        else:  # если данных нет, возвращаем новый словарь
+            return dict()
+
+def insert(key, value):
+    """Запись данных в хранилище"""
+    my_data = get_data()
+    if key in my_data:
+        my_data[key].append(value)
+    else:
+        my_data[key] = [value]
+
+    with open(storage_path, 'w') as f:  # обновление данных в хранилище
+        f.write(json.dumps(my_data))
+
+def get(key):
+    data = get_data()
+    return data.get(key)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()  # создание парсера аргументов
+    parser.add_argument("--key")
+    parser.add_argument("--val")
+    args = parser.parse_args()
+    if args.key and args.val:  # если указано оба аргумента, заносим значение
+        insert(args.key, args.val)
+    elif args.key:  # если указан один ключ, выводим значение
+        print(get(args.key))
+    else:
+        print('Wrong command')
