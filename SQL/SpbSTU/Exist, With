@@ -1,0 +1,68 @@
+  6.	Найдите всех сотрудников, не являющихся руководителями. Выполните это с помощью оператора NOT EXISTS.
+  
+SELECT last_name
+FROM employees f
+WHERE NOT EXISTS (SELECT 'a'
+                FROM employees
+                WHERE manager_id = f.employee_id); /* выбрать строки last_name для которых не существует строк,
+                где эти employee_id являются чьи-то manager_id */
+                
+                
+  9.	Выведите фамилии сотрудников, у которых есть коллеги по отделу, которые были приняты на работу позже, но имеют более высокий оклад.
+
+SELECT last_name
+FROM employees f
+WHERE EXISTS (SELECT 'a'
+            FROM employees
+            WHERE department_id = f.department_id AND /* работают в одном отделе */ 
+            hire_date > f.hire_date AND /* принят на работу позже */
+            salary > f.salary);  /* зарплата выше */
+
+ 
+   10.	Выведите номера, фамилии и наименования отделов всех сотрудников.
+   Используйте скалярный подзапрос в команде SELECT для вывода наименований отделов.
+ 
+SELECT employee_id, last_name,
+NVL((SELECT department_name
+FROM departments
+WHERE department_id = f.department_id), ' ') department
+FROM employees f;
+
+
+  11.	Напишите запрос для вывода наименования отделов и фондов заработной платы отделов,
+  размер которых больше 1/8 от общего фонда заработной платы всей компании.
+  Используйте предложение WITH для создания запроса. Назовите запрос SUMMARY.
+  
+WITH summary AS
+  (SELECT department_name, SUM(salary) dept_total
+  FROM employees JOIN departments
+  USING (department_id)
+  GROUP BY department_name)
+SELECT *
+FROM summary
+WHERE dept_total > (SELECT SUM(salary)
+                    FROM employees) / 8;
+
+
+  12. Для заданного отдела выведите фамилии и зарплаты трех самых высокооплачиваемых сотрудников.
+  Если сотрудников в отделе меньше трех, выведите информацию по всем сотрудникам. Результат отсортировать по убыванию зарплаты.
+  Номер отдела должен отображаться только у сотрудника с наибольшей зарплатой в отделе.
+  
+WITH dept_info AS /* информация по выбранному департаменту, отсортированная по зарплате */
+    (SELECT last_name, salary, department_id
+    FROM employees
+    WHERE department_id = '&&dep_id'
+    ORDER BY salary DESC),
+    emp_c AS
+    (SELECT CASE WHEN (emp_count > 3) THEN 3 /* если сотрудников меньше 3, выводим всех. иначе только трех */
+        ELSE emp_count END
+    FROM
+        (SELECT COUNT(*) emp_count /* подсчет количества сотрудников в департаменте */
+        FROM employees
+        WHERE department_id = '&dep_id'))
+SELECT last_name, salary,
+        CASE WHEN (rownum = 1) THEN TO_CHAR(department_id)  /* номер отдела только в 1 строке */
+        ELSE ' ' END AS department
+FROM dept_info
+WHERE rownum <= (SELECT * FROM emp_c);
+
