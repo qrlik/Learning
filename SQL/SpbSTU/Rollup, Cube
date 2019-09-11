@@ -1,0 +1,26 @@
+  1.	Напишите запрос для вывода следующих данных о сотрудниках, менеджер которых имеет номер меньше 120:
+  •	Номер менеджера (Manager_ID);
+  •	Идентификатор должности (Job_ID) и общий оклад сотрудников для каждой должности (Job_ID), которые подчиняются одному менеджеру;
+  •	Общий оклад сотрудников, сгруппированный по их менеджерам;
+  •	Общий оклад сотрудников независимо от их должности или менеджера.
+
+SELECT NVL(TO_CHAR(manager_id), ' ') manager_id, NVL(job_id, ' ') job_id, SUM(salary), GROUPING(manager_id), GROUPING(JOB_ID)
+FROM employees
+WHERE manager_id < 120
+GROUP BY ROLLUP(manager_id, job_id)
+ORDER BY 4, manager_id, 5, 3 DESC;
+
+
+  3.	Напишите запрос для вывода следующих данных о сотрудниках:
+  •	Номер менеджера (Manager_ID);
+  •	Должность и общий оклад по каждой должности для сотрудников, отчитывающихся перед одним и тем же менеджером;
+  •	Общий оклад сотрудников, сгруппированных по их менеджерам;
+  •	Сводные значения по общей зарплате для каждой должности независимо от менеджера;
+  •	Общий оклад сотрудников независимо от должности и менеджера. 
+
+SELECT NVL(TO_CHAR(manager_id), ' ') manager_id, NVL(job_id, ' ') job_id, SUM(salary) sum, GROUPING(manager_id), GROUPING(JOB_ID)
+    FROM employees
+    WHERE manager_id < 120
+    GROUP BY CUBE(manager_id, job_id)
+    ORDER BY 4, manager_id, 5, 3 DESC;
+
