@@ -1,0 +1,101 @@
+  2.Создайте отчёт, который показывает иерархию менеджеров, которым подчиняется сотрудник Lorentz.
+  Выведите сначала менеджера, перед которым непосредственно отчитывается Lorentz.
+
+SELECT last_name
+FROM employees
+WHERE last_name <> 'Lorentz'
+START WITH last_name = 'Lorentz'
+CONNECT BY PRIOR manager_id = employee_id; /* двигаемся вверх по дереву */
+
+
+  3.	Создайте отчёт с отступом, в котором отражается иерархия управления, начиная с сотрудника по фамилии Kochhar.
+  Выведите фамилии, номера менеджеров и номера отделов сотрудников. Назовите столбцы как показано в примере выходных результатов.
+
+SELECT LPAD(last_name, LENGTH(last_name) + (LEVEL*2)-2, '_') name, manager_id mgr, department_id deptno
+FROM employees
+START WITH last_name = 'Kochhar'
+CONNECT BY PRIOR employee_id = manager_id; /* двигаемся вниз по дереву */
+
+
+  4.	Создайте отчёт, отражающий иерархию управления компанией. Начните с сотрудника самого высокого уровня и исключите из
+  выходных данных всех служащих с идентификатором должности ST_MAN, а также сотрудника De Haan и всех, кто перед ним отчитывается.
+
+SELECT LPAD(last_name, LENGTH(last_name) + LEVEL - 1, ' '), employee_id, manager_id
+FROM employees
+WHERE job_id <> 'ST_MAN' /* исключаем должность */
+START WITH employee_id = 100 /* начинаем с верхнего уровня */
+CONNECT BY PRIOR employee_id = manager_id AND last_name <> 'De Haan'; /* отсекаем ветвь с De Haan */
+
+
+  6.	Создать запрос для вывода только правильно написанных выражений со скобками (количество открывающих и закрывающих скобок должно
+  быть одинаково, каждой открывающей скобке должна соответствовать закрывающая, первая скобка в выражении не должна быть закрывающей).
+  Примеры неправильных выражений:
+  ((((a)g)q)
+  z)(s)(
+  (((f)e)w))(h(g(w))
+
+
+WITH str_chars AS (SELECT SUBSTR('&&text', LEVEL, 1) chars /* разбиваем строку по-символьно */
+        FROM dual
+        CONNECT BY LEVEL <= LENGTH('&text')),
+    str_bkt AS (SELECT chars /* оставляем только скобки */
+        FROM str_chars
+        WHERE chars IN ('(',')')),
+    str_nums AS (SELECT TO_NUMBER(CASE chars WHEN '(' THEN 1 ELSE -1 END) AS nums, rownum rown /* заменяем их на 1 и -1 */
+        FROM str_bkt),            
+    nums_summ AS (SELECT nums, rown,(SELECT SUM(nums) /* добавляем столбец с финальной суммой и промежуточной суммой */
+                                FROM str_nums) summ,
+                                (SELECT SUM(nums)
+                                FROM str_nums
+                                WHERE rown <= f.rown) results
+                    FROM str_nums f),
+    final_check AS (SELECT summ, MIN(results) min /* группируем по сумме и минимальному значению промежуточной */
+                    FROM nums_summ
+                    GROUP BY summ)
+SELECT CASE WHEN (min < 0 OR summ <> 0) THEN NULL /* если минимальная >= 0 и итоговая равна 0, значит строка валидная */
+        ELSE '&text' END AS results
+FROM final_check;
+
+
+  7.	Используя таблицы REGIONS, COUNTRIES, LOCATIONS, DEPARTMENTS, построить (показать) иерархию объектов "Регион – Страна – Местоположение – Подразделение" для региона name = ' Americas '. Иерархия должна быть построена (показана) одной командой SELECT.В результате вывести: 
+  - номер уровня, на котором находится в иерархии данный объект (LEVEL), 
+  - имя объекта, дополненное слева (LEVEL -1)*3 пробелами.
+  Объекты одного уровня должны быть отсортированы по именам. 
+  
+WITH info AS /* общая таблица (имя, region_id, parent_id), приписки на случай если есть дубликаты имен */
+    (SELECT region_name AS title, TO_CHAR(region_id) AS title_id, '0' AS parent_id
+    FROM regions 
+    WHERE region_name = 'Americas'
+    UNION
+    SELECT country_name, TO_CHAR(country_id) || '_C', TO_CHAR(region_id)
+    FROM countries
+    UNION
+    SELECT city, TO_CHAR(location_id) || '_T', TO_CHAR(country_id) || '_C'
+    FROM locations
+    UNION
+    SELECT department_name, TO_CHAR(department_id) || '_D', TO_CHAR(location_id) || '_T'
+    FROM departments)
+SELECT level "Уровень", LPAD(title, LENGTH(title) + 3 * (LEVEL - 1),' ') "Единица"
+FROM info
+START WITH title = 'Americas'
+CONNECT BY PRIOR title_id = parent_id
+ORDER SIBLINGS BY title; /* сортировать надо только в пределах одного уровня иерархии */
+
+
+  9.	Создать запрос для определения сумм окладов сотрудников от сотрудников, не имеющих начальника, до сотрудников,
+  не имеющих подчиненных. 
+  
+WITH tree_search AS (SELECT LTRIM(SYS_CONNECT_BY_PATH(last_name, '->'), '->') "Список сотрудников",
+                        (SELECT SUM(salary)
+                        FROM employees s
+                        START WITH s.employee_id = f.employee_id
+                        CONNECT BY PRIOR manager_id = employee_id) "Сумма зарплат"
+                    FROM employees f
+                    WHERE NOT EXISTS (SELECT 'a' /* не имеющих подчиненных */
+                                    FROM employees
+                                    WHERE manager_id = f.employee_id) 
+                    START WITH manager_id IS NULL /* не имеющих начальника */
+                    CONNECT BY PRIOR employee_id = manager_id /* двигаемся вниз по дереву */
+                    ORDER BY 2 DESC)
+SELECT rownum "Номер", "Список сотрудников", "Сумма зарплат"
+FROM tree_search;
