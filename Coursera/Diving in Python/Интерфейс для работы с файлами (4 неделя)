@@ -1,0 +1,61 @@
+"""
+В этом задании вам нужно создать интерфейс для работы с файлами. Класс File должен поддерживать несколько необычных операций.
+Класс инициализируется полным путем.
+Класс должен поддерживать метод write.
+Объекты типа File должны поддерживать сложение. В этом случае создается новый файл и файловый объект, в котором содержимое второго файла добавляется к содержимому первого файла.
+Новый файл должен создаваться в директории, полученной с помощью tempfile.gettempdir. Для получения нового пути можно использовать os.path.join.
+Объекты типа File должны поддерживать протокол итерации, причем итерация проходит по строкам файла.
+И наконец, при выводе файла с помощью функции print должен печататься его полный путь, переданный при инициализации.
+"""
+
+import os.path
+import tempfile
+import time
+
+
+class File:
+    """Интерфейс для работы с файлами"""
+    def __init__(self, path):
+        self.path = path
+        self.current_position = 0
+
+        if not os.path.exists(self.path):  # если файл несуществует, создаем и закрываем
+            open(self.path, 'w').close()
+
+    def write(self, content):
+        """Запись в файл"""
+        with open(self.path, 'w') as f:
+            return f.write(content)
+
+    def read(self):
+        """Чтение из файла"""
+        with open(self.path, 'r') as f:
+            return f.read()
+
+    def __add__(self, obj):
+        new_path = os.path.join(  # генерируем имя нового файла с помощью time
+            tempfile.gettempdir(),
+            str(time.time())
+        )
+        new_file = type(self)(new_path)
+        new_file.write(self.read() + obj.read())
+
+        return new_file
+
+    def __str__(self):
+        return self.path
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        with open(self.path, 'r') as f:
+            f.seek(self.current_position)  # переход на текущую позицию итерации
+
+            line = f.readline()
+            if not line:  # если конец файла, возвращаем флаг в 0
+                self.current_position = 0
+                raise StopIteration('File is finished')
+
+            self.current_position = f.tell()  # передвигаем флаг в новую позицию
+            return line
