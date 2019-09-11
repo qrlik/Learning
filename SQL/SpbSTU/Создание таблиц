@@ -1,0 +1,28 @@
+20.	Создайте таблицу EMP_HIST на основе таблицы EMPLOYEES, включив в нее три столбца  FIRST_NAME, LAST_NAME, EMAIL
+Увеличьте размер столбца EMAIL до 45.
+Вставьте данные из таблицы  EMP_DATA  в таблицу EMP_HIST, предполагая, что сведения в таблице EMP_DATA  наиболее свежие.
+Если строка в таблице EMP_DATA  совпадает со строкой EMP_HIST, измените e-mail в таблице EMP_HIST  на соответствующий e-mail в
+таблице EMP_DATA. Если в таблице   EMP_DATA есть строка, которой нет в таблице EMP_HIST, вставьте ее в таблицу EMP_HIST. 
+Строки в таблицах считаются соответствующими, когда фамилии и имена сотрудников идентичны. 
+После выполнения задания выведите на экран содержимое таблицы  EMP_HIST.
+
+CREATE TABLE emp_list /* Создаем таблицу на основе employees */
+AS SELECT first_name, last_name, email
+FROM employees;
+
+ALTER TABLE emp_list /* Увеличиваем размер столбца email До 45 */
+MODIFY email VARCHAR2(45);
+
+MERGE INTO emp_list l /* Соединяем таблицы по имени и фамилии */
+    USING emp_data d
+    ON (l.first_name = d.first_name
+    AND l.last_name = d.last_name)
+WHEN MATCHED THEN /* обновляем email на более свежий */
+    UPDATE SET
+    l.email = d.email
+WHEN NOT MATCHED THEN /* вставляем недостающие данные */
+ INSERT (l.first_name, l.last_name, l.email)
+ VALUES (d.first_name, d.last_name, d.email);
+
+SELECT * FROM emp_list
+ORDER BY last_name;
