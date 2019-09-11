@@ -1,0 +1,75 @@
+import socket
+import time
+
+
+class ClientError(Exception):
+    """Error class for client"""
+    pass
+
+
+class Client:
+    def __init__(self, host, port, timeout=None):
+        try:
+            self._sock = socket.create_connection((host, port), timeout)  # соединение с сервером
+        except socket.error as err:
+            raise ClientError("Create connection error", err)
+
+    def _read(self):
+        data = b""
+        while not data.endswith(b"\n\n"):
+            try:
+                data += self._sock.recv(1024)  # заполнение данными
+            except socket.error as err:
+                raise ClientError("Read data error", err)
+        decoded_data = data.decode()
+        status, end_data = decoded_data.split("\n", 1)  # разбиваем данные на статус и метрики
+        end_data = end_data.strip()  # удаляем лишние символы
+        if status == "error":
+            raise ClientError("Error status from server")
+        return end_data  # возвращаем строку с метриками
+
+    def put(self, key, value, timestamp=None):
+        timestamp = timestamp or str(int(time.time()))  # считываем время
+        try:
+            self._sock.sendall(f"put {key} {value} {timestamp}\n".encode())  # отправка данных
+        except socket.error as err:
+            raise ClientError("Send 'put' error", err)
+        self._read()  # проверка статуса ответа от сервера
+
+    def get(self, key):
+        try:
+            self._sock.sendall(f"get {key}\n".encode())  # отправка запроса с ключом
+        except socket.error as err:
+            raise ClientError("Send 'get' error", err)
+        load_data = self._read()
+        dict_data = {}
+        if load_data == "":
+            return dict_data
+        for row in load_data.split("\n"):  # разбиваем метрики построчно
+            key, value, timestamp = row.split()  # разбираем метрику на значения
+            if key not in dict_data:
+                dict_data[key] = []
+            dict_data[key].append((int(timestamp), float(value)))  # заносим данные в словарь
+        return dict_data  # возвращаем заполненный словарь
+
+    def close(self):
+        try:
+            self._sock.close()  # закрываем соединение с сервером
+        except socket.error as err:
+            raise ClientError("Close connection error", err)
+
+
+if __name__ == "__main__":
+    client = Client("127.0.0.1", 8888, timeout=15)
+
+    client.put("palm.cpu", 0.5, timestamp=1150864247)
+    client.put("palm.cpu", 2.0, timestamp=1150864248)
+    client.put("palm.cpu", 0.5, timestamp=1150864248)
+
+    client.put("eardrum.cpu", 3, timestamp=1150864250)
+    client.put("eardrum.cpu", 4, timestamp=1150864251)
+    client.put("eardrum.memory", 4200000)
+
+    print(client.get("*"))
+
+    client.close()
