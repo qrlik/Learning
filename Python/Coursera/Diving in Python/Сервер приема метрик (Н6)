@@ -1,0 +1,74 @@
+"""
+Как обычно вам необходимо разработать программу в одном файле-модуле, который вы загрузите на проверку обычным способом.
+Сервер должен соответствовать протоколу, который был описан в задании к предыдущей неделе.
+Он должен уметь принимать от клиентов команды put и get, разбирать их, и формировать ответ согласно протоколу.
+По запросу put требуется сохранять метрики в структурах данных в памяти процесса.
+По запросу get сервер обязан отдавать данные в правильной последовательности.
+На верхнем уровне вашего модуля должна быть объявлена функция run_server(host, port) — она принимает адрес и порт, на которых
+должен быть запущен сервер.
+Для проверки правильности решения мы воспользуемся своей реализацией клиента и будем отправлять на ваш сервер put и get запросы,
+ожидая в ответ правильные данные от сервера (согласно объявленному протоколу). Все запросы будут выполняться с таймаутом — сервер
+должен отвечать за приемлемое время.
+Сервер должен быть готов к неправильным командам со стороны клиента и отдавать клиенту ошибку в формате, оговоренном в протоколе.
+В таком случае работа сервера не должна завершаться аварийно.
+"""
+import asyncio
+
+METRIC_BASE = list()
+
+class ClientServerProtocol(asyncio.Protocol):
+    def __init__(self):
+        self.transport = None
+
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def data_received(self, data):
+        resp = self.process_data(data)
+        self.transport.write(resp.encode())
+
+    def process_data(self, data):
+        decoded_data = data[:-1].decode()  # {command} {key} [{value} {timestamp}]
+        final_data = decoded_data.split()  # разбиваем метрику для дальнейшего анализа
+        command = final_data[0]
+        metric = final_data[1:]
+        if command == "get":
+            return self._get(metric)
+        elif command == "put":
+            return self._put(metric)
+        else:
+            return "error\nwrong command\n\n"
+
+    def _get(self, metric):
+        if len(metric) != 1:  # если в значении не только ключ
+            return "error\nwrong command\n\n"
+        data = list(map(lambda space: ' '.join(space),
+                        METRIC_BASE if metric[0] == '*'  # join для всей базы метрик
+                        else filter(lambda key: key[0] == metric[0], METRIC_BASE)))  # join элементов с подходящим ключом
+        # return "ok\n" + "\n".join(data) + "\n\n"
+        return "\n".join(["ok"] + data + ["\n"])
+
+    def _put(self, metric):
+        if len(metric) != 3 and not (metric[1].isdigit() and metric[2].isdigit()):  # если в метрике не 3 элемента и value\timestamp не числа
+            return "error\nwrong command\n\n"
+        if metric not in METRIC_BASE:
+            METRIC_BASE.append(metric)
+        return "ok\n\n"
+
+def run_server(host='127.0.0.1', port=8888):
+    loop = asyncio.get_event_loop()
+    coro = loop.create_server(ClientServerProtocol, host, port)
+
+    server = loop.run_until_complete(coro)
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    server.close()
+    loop.run_until_complete(server.wait_closed())
+    loop.close()
+
+if __name__ == '__main__':
+    run_server()
