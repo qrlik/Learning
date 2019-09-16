@@ -7,7 +7,7 @@
 #include <tchar.h>
 #include "mystring.h"
 #include "point.h"
-#include "BD.h"
+#include "key_value.h"
 #define	  stop __asm nop
 
 int _tmain(int argc, _TCHAR* argv[])
