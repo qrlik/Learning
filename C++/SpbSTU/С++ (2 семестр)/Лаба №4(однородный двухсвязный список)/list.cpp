@@ -36,14 +36,14 @@ List::List(const List& other): m_size(0)
 {
 	Head.m_Next = &Tail; // замыкаемся для корректного копирования
 	Tail.m_Prev = &Head;
-	*this = other; // конструктор копирования
+	*this = other; // оператор копирования
 }
 
 List::List(List&& other)// копируются указатели головы,хвоста
 {
 	Head.m_Next = &Tail; // замыкаемся для корректного копирования
 	Tail.m_Prev = &Head;
-	*this = std::move(other); // move-конструктор копирования
+	*this = std::move(other); // move-оператор копирования
 }
 
 List& List::operator=(const List& other)
