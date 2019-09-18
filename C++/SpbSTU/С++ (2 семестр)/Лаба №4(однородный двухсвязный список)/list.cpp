@@ -41,6 +41,8 @@ List::List(const List& other): m_size(0)
 
 List::List(List&& other)// копируются указатели головы,хвоста
 {
+	Head.m_Next = &Tail; // замыкаемся для корректного копирования
+	Tail.m_Prev = &Head;
 	*this = std::move(other); // move-конструктор копирования
 }
 
