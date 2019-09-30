@@ -45,7 +45,8 @@ struct my_compare // предикат для строк
 		return strcmp(lhm, rhm) < 0;
 	}
 };
-
+// следующие три шаблона можно объединить в один, но я пока не знаю как на этапе компиляции различать какой тип(примитивный или др.)
+// поступил в шаблон
 template <typename T1, typename T2, typename T3> void print_map(const map<T1, T2, T3>& m) // обычная печать словаря
 {
 	typename map<T1, T2>::const_iterator itb = m.cbegin(), ite = m.cend();
