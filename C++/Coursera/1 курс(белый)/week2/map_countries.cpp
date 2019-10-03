@@ -3,6 +3,15 @@
 #include <map>
 using namespace std;
 
+/*
+На вход программе поступают следующие запросы:
+CHANGE_CAPITAL countrynew_capital — изменение столицы страны country на new_capital,
+либо добавление такой страны с такой столицей, если раньше её не было.
+RENAME old_country_namenew_country_name — переименование страны из old_country_name в new_country_name.
+ABOUT country — вывод столицы страны country.
+DUMP — вывод столиц всех стран.
+*/
+
 void change_capital(map<string,string>& world, const string& country, const string& new_capital)
 {
 	if (world.count(country) == 0) // если страны нету
