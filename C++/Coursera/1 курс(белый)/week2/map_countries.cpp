@@ -81,7 +81,7 @@ void dump(const map<string, string>& world)
 int main()
 {
 	map<string, int> commands = { {"CHANGE_CAPITAL", 0}, {"RENAME", 1}, {"ABOUT", 2}, {"DUMP", 3} }; // карта команд
-	map<string, string> world; // карта маршрутов и остановок
+	map<string, string> world; // список стран и столиц
 	int count; // количество команд
 	string command; // команда ввода
 	cin >> count;
