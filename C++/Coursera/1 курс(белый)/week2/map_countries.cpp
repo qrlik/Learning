@@ -80,10 +80,10 @@ void dump(const map<string, string>& world)
 
 int main()
 {
-	map<string, int> commands = { {"CHANGE_CAPITAL", 0}, {"RENAME", 1}, {"ABOUT", 2}, {"DUMP", 3} };
-	map<string, string> world;
-	int count;
-	string command;
+	map<string, int> commands = { {"CHANGE_CAPITAL", 0}, {"RENAME", 1}, {"ABOUT", 2}, {"DUMP", 3} }; // карта команд
+	map<string, string> world; // карта маршрутов и остановок
+	int count; // количество команд
+	string command; // команда ввода
 	cin >> count;
 	for (int i = 0; i < count; ++i)
 	{
