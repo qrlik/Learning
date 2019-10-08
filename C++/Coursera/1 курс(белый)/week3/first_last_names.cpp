@@ -5,12 +5,11 @@
 using namespace std;
 /*
 Реализуйте класс для человека, поддерживающий историю изменений человеком своих фамилии и имени.
-Считайте, что в каждый год может произойти не более одного изменения фамилии и не более одного изменения имени. При этом с течением времени могут открываться всё новые факты из прошлого человека, поэтому года́ в последовательных вызовах методов ChangeLastName и ChangeFirstName не обязаны возрастать.
-
+Считайте, что в каждый год может произойти не более одного изменения фамилии и не более одного изменения имени. При этом с течением времени могут открываться
+всё новые факты из прошлого человека, поэтому года́ в последовательных вызовах методов ChangeLastName и ChangeFirstName не обязаны возрастать.
 Гарантируется, что все имена и фамилии непусты.
 
 Строка, возвращаемая методом GetFullName, должна содержать разделённые одним пробелом имя и фамилию человека по состоянию на конец данного года.
-
 Если к данному году не случилось ни одного изменения фамилии и имени, верните строку "Incognito".
 Если к данному году случилось изменение фамилии, но не было ни одного изменения имени, верните "last_name with unknown first name".
 Если к данному году случилось изменение имени, но не было ни одного изменения фамилии, верните "first_name with unknown last name".
@@ -18,6 +17,15 @@ using namespace std;
 В отличие от метода GetFullName, метод GetFullNameWithHistory должен вернуть не только последние имя и фамилию к концу данного года, но ещё и все
 предыдущие имена и фамилии в обратном хронологическом порядке. Если текущие факты говорят о том, что человек два раза подряд изменил фамилию или имя
 на одно и то же, второе изменение при формировании истории нужно игнорировать.
+
+Дополните класс Person конструктором, позволяющим задать имя и фамилию человека при рождении, а также сам год рождения.
+Класс не должен иметь конструктора по умолчанию.
+
+При получении на вход года, который меньше года рождения:
+
+методы GetFullName и GetFullNameWithHistory должны отдавать "No person";
+методы ChangeFirstName и ChangeLastName должны игнорировать запрос.
+Кроме того, необходимо объявить константными все методы, которые по сути ими являются.
 */
 
 class Person
@@ -26,14 +34,26 @@ private:
 	map<int, string, greater<int>> m_first; // карта изменений имени по убыванию (для корректной работы lower_bound)
 	map<int, string, greater<int>> m_last; // карта изменений фамилии по убыванию
 public:
-	void ChangeFirstName(int year, const string& first_name)
-	{// добавить факт изменения имени на first_name в год year
-		m_first[year] = first_name;
+	Person(const string& first, const string& last, int birth) // заносим данные при рождении
+	{// т.к карты идут по убыванию, год рождения всегда должен быть в конце карты
+		this->m_first[birth] = first;
+		this->m_last[birth] = last;
 	}
 
-	void ChangeLastName(int year, const string& last_name) 
+	void ChangeFirstName(int year, const string& first_name)
+	{// добавить факт изменения имени на first_name в год year
+		if (m_first.lower_bound(year) != m_first.end()) // если year < birth, запрос игнорируется
+		{
+			m_first[year] = first_name;
+		}
+	}
+
+	void ChangeLastName(int year, const string& last_name)
 	{// добавить факт изменения фамилии на last_name в год year
-		m_last[year] = last_name;
+		if (m_last.lower_bound(year) != m_last.end()) // если year < birth, запрос игнорируется
+		{
+			m_last[year] = last_name;
+		}
 	}
 
 	vector<string> GetNamesHistory(const map<int, string, greater<int>>& map, int year) const
@@ -67,6 +87,10 @@ public:
 
 	string BuildFullName(int year, bool history) const // получает имя и фамилию, после анализа выводит результирующую строку
 	{
+		if (m_first.lower_bound(year) == m_first.end()) // если year < birth, запрос игнорируется
+		{
+			return "No person";
+		}
 		vector<string> names = GetNamesHistory(m_first, year); // вектор истории имен
 		string first_names = BuildNamesHistory(names, history); // получаем строку имен (с историей / без истории)
 		names = GetNamesHistory(m_last, year); // переписываем на вектор фамилий
@@ -89,7 +113,7 @@ public:
 		}
 	}
 
-	string GetFullName(int year) const 
+	string GetFullName(int year) const
 	{
 		return BuildFullName(year, false);
 	}
@@ -101,16 +125,20 @@ public:
 };
 
 int main() {
-	//Person person;
+	/*
+	// first task
+	Person person;
 
-	//person.ChangeFirstName(1900, "Eugene");
-	//person.ChangeLastName(1900, "Sokolov");
-	//person.ChangeLastName(1910, "Sokolov");
-	//person.ChangeFirstName(1920, "Evgeny");
-	//person.ChangeLastName(1930, "Sokolov");
-	//cout << person.GetFullNameWithHistory(1940) << endl;
-	////Evgeny (Eugene) Sokolov
-
+	person.ChangeFirstName(1900, "Eugene");
+	person.ChangeLastName(1900, "Sokolov");
+	person.ChangeLastName(1910, "Sokolov");
+	person.ChangeFirstName(1920, "Evgeny");
+	person.ChangeLastName(1930, "Sokolov");
+	cout << person.GetFullNameWithHistory(1940) << endl;
+	//Evgeny (Eugene) Sokolov
+	*/
+	/*
+	// second task
 	Person person;
 
 	person.ChangeFirstName(1965, "Polina");
@@ -155,5 +183,22 @@ int main() {
 	person.ChangeLastName(1961, "Ivanova");
 	cout << person.GetFullNameWithHistory(1967) << endl;
 	//Pauline (Polina) Sergeeva (Ivanova, Sergeeva)
+	*/
+
+	Person person("Polina", "Sergeeva", 1960);
+	for (int year : {1959, 1960}) {
+		cout << person.GetFullNameWithHistory(year) << endl;
+	}
+
+	person.ChangeFirstName(1965, "Appolinaria");
+	person.ChangeLastName(1967, "Ivanova");
+	for (int year : {1965, 1967}) {
+		cout << person.GetFullNameWithHistory(year) << endl;
+	}
+
+	//No person
+	//Polina Sergeeva
+	//Appolinaria(Polina) Sergeeva
+	//Appolinaria(Polina) Ivanova(Sergeeva)
 	return 0;
 }
