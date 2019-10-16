@@ -24,7 +24,7 @@ struct Region
 };
 
 struct reg_wrapper
-{
+{ // обертка для регионов, чтобы использовать ключи-ссылки в словаре, а не делать тяжелые копии
 	const Region& reg_ref;
 	explicit reg_wrapper(const Region& reg) : reg_ref(reg) {}
 	operator Region() { return reg_ref; }
