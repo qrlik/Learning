@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include <map>
 #include <vector>
 #include <tuple>
@@ -46,28 +47,12 @@ struct reg_wrapper
 
 int FindMaxRepetitionCount(const vector<Region>& regions)
 {
-	// 1.map<Region&, count>
-	// vector -> map
-	// for(map) -> max count
-	map<reg_wrapper, int> search; // карта поиска (регион(ссылка в обертке) - количество повторов)
-	for (size_t i = 0; i < regions.size(); ++i)
-	{
-		if (search.find(static_cast<reg_wrapper>(regions[i])) == search.end())
-		{ // если данный регион еще не встречался
-			for (size_t j = i; j < regions.size(); ++j)
-			{ // считаем все повторы
-				++search[static_cast<reg_wrapper>(regions[j])];
-			}
-		}
-	}
 	int result = 0;
-	for (const auto& reg : search)
-	{
-		if (reg.second > result)
-		{
-			result = reg.second;
-		}
-	}
+	map<reg_wrapper, int> search; // карта поиска (регион(ссылка в обертке) - количество повторов)
+	for (const auto& reg : regions)
+	{ // сразу заносим в карту и ищем максимум
+		result = max(result, ++search[static_cast<reg_wrapper>(reg)]);
+	} // красивое решение, до которого я не додумался =)
 	return result;
 }
 
@@ -129,6 +114,6 @@ int main() {
 			31
 		},
 		}) << endl;
-
+	// 3 1
 	return 0;
 }
