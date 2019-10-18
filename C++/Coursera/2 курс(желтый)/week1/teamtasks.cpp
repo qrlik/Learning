@@ -11,6 +11,11 @@ enum class TaskStatus { NEW, IN_PROGRESS, TESTING, DONE };
 // Объявляем тип-синоним для map<TaskStatus, int>, позволяющего хранить количество задач каждого статуса
 using TasksInfo = map<TaskStatus, int>;
 
+TaskStatus Next(TaskStatus task_status)
+{// Выделим в отдельную функцию получение следующего по приоритету типа задачи
+	return static_cast<TaskStatus>(static_cast<int>(task_status) + 1);
+}
+
 void PrintTasksInfo(TasksInfo tasks_info)
 { // печать состаяния заданий
 	cout << tasks_info[TaskStatus::NEW] << " new tasks" <<
@@ -38,37 +43,27 @@ public:
 	// Обновить статусы по данному количеству задач конкретного разработчика, подробности см. ниже
 	tuple<TasksInfo, TasksInfo> PerformPersonTasks(const string& person, int task_count)
 	{// Гарантируется, что task_count является положительным числом
-		TasksInfo updated, not_updated; // список обновленных и необновленных задач
-		vector<TaskStatus> for_delete;
-		for (auto& task : team[person]) // ПРОВЕРЬ НА task_count > size!!!!!!!!!!!!!!
-		{// пары задание - количествоэ
-			if (task.first != TaskStatus::DONE)
+		TasksInfo updated, not_updated, summary; // карты обновленных, необновленных задач, и их сумма
+		//чтобы не выделять память под summary можно в конце сделать цикл обновления tasks_map по updated + not_updated
+		//либо делать вектор для сохранения нулевых ключей и цикл очистки нулей + цикл добавления значений updated (либо сделать функцию)
+		TasksInfo& tasks_map = team[person]; // ссылка на карту заданий данного сотрудника
+		for (TaskStatus task_code = TaskStatus::NEW; task_code < TaskStatus::DONE; task_code = Next(task_code))
+		{// итерируемся по кодам заданий
+			if (task_count > 0)
 			{
-				if (task_count > 0)
-				{ // проверяем только невыполненные
-					int how_much = (task.second < task_count) ? task.second : task_count; // сколько вычитаем (либо все задачи, либо часть)
-					task.second -= how_much; // вычитаем нужное количество
-					if (task.second == 0)
-					{ // если элементов не осталось, заносим ключ в список на удаление
-						for_delete.push_back(task.first);
-					}
-					task_count -= how_much; // уменьшаем счетчик
-					updated[static_cast<TaskStatus>(static_cast<int>(task.first) + 1)] = how_much; // занесли в обновленный
-				}
-				if (task_count == 0)
-				{ // если обновили не все задачи типа task.first
-					not_updated[task.first] = task.second; // занести все в not_updated
-				}
+				updated[Next(task_code)] = min(task_count, tasks_map[task_code]); // занесли в обновленный минимальное значение
+				summary[Next(task_code)] = updated[Next(task_code)]; // занесли в суммарный
+				tasks_map[task_code] -= updated[Next(task_code)]; // получаем либо 0 либо остаток операций
+				task_count -= updated[Next(task_code)]; // уменьшаем счетчик
 			}
-		} // имеет готовый результат, нужно изменить team[person]
-		for (const auto& key_to_delete : for_delete)
-		{ // очищаем ненужные ключи
-			team[person].erase(key_to_delete);
-		}
-		for (const auto& pair_to_add : updated)
-		{ // заносим обновленные ключи
-			team[person][pair_to_add.first] += pair_to_add.second;
-		}
+			if (task_count == 0)
+			{ // если обновили не все задачи типа task.first
+				not_updated[task_code] = tasks_map[task_code]; // занести все в not_updated
+				summary[task_code] += tasks_map[task_code];  // дополняем суммарную карту
+			}
+		} // имеет готовый результат
+		summary[TaskStatus::DONE] += tasks_map[TaskStatus::DONE]; // забираем старые выполненные задачи из старой карты
+		tasks_map = std::move(summary); // меняем исходную карту на актуальную
 		return tuple(updated, not_updated);
 	}
 };
