@@ -1,0 +1,216 @@
+#include <iostream>
+#include <algorithm>
+#include <sstream>
+#include <map>
+#include <vector>
+#include <tuple>
+#include <string>
+#include <cassert>
+
+using namespace std;
+
+/*
+В курсе «Белый пояс по С++» у нас была задача «Автобусные остановки — 1».
+В этой задаче вам будет дано её правильное решение, целиком содержащееся внутри функции main.
+Вам надо будет выполнить декомпозицию этого решения на заранее заданные блоки так,
+чтобы получившаяся программа так же корректно решала задачу.
+*/
+
+enum class QueryType { NewBus, BusesForStop, StopsForBus, AllBuses }; // тип команды
+
+struct Query // структура для хранения ввода
+{
+	QueryType type; // тип команды
+	string bus; // маршрут
+	string stop; // остановка
+	vector<string> stops; // список остановок
+};
+
+istream& operator >> (istream& is, Query& q) // порядок считывания данных из потока
+{
+	string operation_code;
+	is >> operation_code;
+	if (operation_code == "NEW_BUS")
+	{
+		q.type = QueryType::NewBus;
+		int stop_count = 0;
+		cin >> q.bus >> stop_count;
+		q.stops.resize(stop_count);
+		for (string& stop : q.stops)
+		{
+			is >> stop;
+		}
+	}
+	else if (operation_code == "BUSES_FOR_STOP")
+	{
+		q.type = QueryType::BusesForStop;
+		is >> q.stop;
+	}
+	else if (operation_code == "STOPS_FOR_BUS")
+	{
+		q.type = QueryType::StopsForBus;
+		is >> q.bus;
+	}
+	else if (operation_code == "ALL_BUSES")
+	{
+		q.type = QueryType::AllBuses;
+	}
+	return is;
+} // считываем данные команды
+
+struct BusesForStopResponse // обработка списка маршрутов
+{
+	stringstream ss;
+	BusesForStopResponse()
+	{ // по умолчанию остановки нет
+		ss << "No stop";
+	}
+	BusesForStopResponse(const vector<string>& buses)
+	{ // список маршрутов через данную остановку
+		for (const auto& bus : buses)
+		{
+			ss << bus << " ";
+		}
+	}
+};
+
+ostream& operator << (ostream& os, const BusesForStopResponse& r)
+{
+	return os << r.ss.str();
+}
+
+struct StopsForBusResponse
+{
+	stringstream ss;
+	StopsForBusResponse()
+	{ // по умолчанию маршрута нет
+		ss << "No bus";
+	}
+	StopsForBusResponse(const string& bus, const vector<string>& stops, const map<string, vector<string>>& stops_to_buses)
+	{ // для маршрута список остановок и для каждой остановки список других маршрутов, проходящих через неё
+		for (const string& stop : stops)
+		{
+			ss << "Stop " << stop << ": ";
+			if (stops_to_buses.at(stop).size() == 1)
+			{
+				ss << "no interchange";
+			}
+			else
+			{
+				for (const string& other_bus : stops_to_buses.at(stop))
+				{
+					if (bus != other_bus)
+					{
+						ss << other_bus << " ";
+					}
+				}
+			}
+			ss << endl;
+		}
+	}
+};
+
+ostream& operator << (ostream& os, const StopsForBusResponse& r)
+{
+	return os << r.ss.str();
+}
+
+struct AllBusesResponse
+{
+	stringstream ss;
+	AllBusesResponse()
+	{ // по умолчанию маршрутов нет
+		ss << "No buses";
+	}
+	AllBusesResponse(const map<string, vector<string>> buses_to_stops)
+	{ // все маршруты и их список остановок
+		for (const auto& bus_item : buses_to_stops)
+		{
+			ss << "Bus " << bus_item.first << ": ";
+			for (const string& stop : bus_item.second)
+			{
+				ss << stop << " ";
+			}
+			ss << endl;
+		}
+	}
+};
+
+ostream& operator << (ostream& os, const AllBusesResponse& r)
+{
+	return os << r.ss.str();
+}
+
+class BusManager // хранилище данных и работа с ними
+{
+public:
+	void AddBus(const string& bus, const vector<string>& stops) // добавление маршрута + списка остановок
+	{
+		buses_to_stops[bus] = stops;
+		for (const string& stop : stops)
+		{
+			stops_to_buses[stop].push_back(bus);
+		}
+	}
+
+	BusesForStopResponse GetBusesForStop(const string& stop) const
+	{
+		if (stops_to_buses.count(stop) == 0)
+		{ // если остановки нет вызываем BusesForStopResponse()
+			return {};
+		}
+		return { stops_to_buses.at(stop) }; // иначе возвращаем обработанный список
+	}
+
+	StopsForBusResponse GetStopsForBus(const string& bus) const
+	{
+		if (buses_to_stops.count(bus) == 0)
+		{ // если маршрута нет вызываем StopsForBusResponse()
+			return {};
+		}
+		return { bus, buses_to_stops.at(bus), stops_to_buses }; // иначе возвращаем обработанный список
+	}
+
+	AllBusesResponse GetAllBuses() const
+	{
+		if (buses_to_stops.empty())
+		{ // если маршрутов нет вызываем AllBusesResponse()
+			return {};
+		}
+		return { buses_to_stops }; // иначе возвращаем обработанный список
+	}
+private:
+	map<string, vector<string>> buses_to_stops;
+	map<string, vector<string>> stops_to_buses;
+};
+
+int main()
+{
+	int query_count;
+	Query q;
+
+	cin >> query_count;
+
+	BusManager bm;
+	for (int i = 0; i < query_count; ++i)
+	{
+		cin >> q;
+		switch (q.type)
+		{
+		case QueryType::NewBus:
+			bm.AddBus(q.bus, q.stops);
+			break;
+		case QueryType::BusesForStop:
+			cout << bm.GetBusesForStop(q.stop) << endl;
+			break;
+		case QueryType::StopsForBus:
+			cout << bm.GetStopsForBus(q.bus) << endl;
+			break;
+		case QueryType::AllBuses:
+			cout << bm.GetAllBuses() << endl;
+			break;
+		}
+	}
+
+	return 0;
+}
