@@ -6,6 +6,17 @@
 #include <set>
 #include <map>
 
+void Assert(bool b, const std::string& hint); // проверка на логическое соответствие
+
+class TestRunner
+{
+private:
+	int fail_count = 0; // счетчик упавших тестов
+public:
+	template <class TestFunc> void RunTest(TestFunc func, const std::string& test_name); // шаблонный запуск тестирующей функции
+	~TestRunner(); // проверка на верность тестов
+};
+
 template <class T> std::ostream& operator<<(std::ostream& os, const std::vector<T>& s) // шаблонный вывод вектора
 {
 	os << "[";
@@ -66,41 +77,3 @@ template<class T, class U> void AssertEqual(const T& t, const U& u, const std::s
 		throw std::runtime_error(os.str());
 	}
 }
-
-void Assert(bool b, const std::string& hint) // проверка на логическое соответствие
-{
-	AssertEqual(b, true, hint);
-}
-
-class TestRunner
-{
-private:
-	int fail_count = 0; // счетчик упавших тестов
-public:
-	template <class TestFunc> void RunTest(TestFunc func, const std::string& test_name) // шаблонный запуск тестирующей функции
-	{
-		try
-		{
-			func();
-			std::cerr << test_name << " OK" << std::endl;
-		}
-		catch (std::exception & e)
-		{
-			++fail_count;
-			std::cerr << test_name << " fail: " << e.what() << std::endl;
-		}
-		catch (...)
-		{
-			++fail_count;
-			std::cerr << "Unknown exception caught" << std::endl;
-		}
-	}
-	~TestRunner() // проверка на верность тестов
-	{
-		if (fail_count > 0)
-		{
-			std::cerr << fail_count << " unit tests failed. Terminate" << std::endl;
-			exit(1);
-		}
-	}
-};
