@@ -25,8 +25,14 @@ StopsForBusResponse::StopsForBusResponse()
 
 StopsForBusResponse::StopsForBusResponse(const std::string& bus, const std::vector<std::string>& stops, const std::map<std::string, std::vector<std::string>>& stops_to_buses)
 { // для маршрута список остановок и для каждой остановки список других маршрутов, проходящих через неё
+	bool first = true;
 	for (const std::string& stop : stops)
 	{
+		if (!first)
+		{
+			ss << std::endl;
+		}
+		first = false;
 		ss << "Stop " << stop << ": ";
 		if (stops_to_buses.at(stop).size() == 1)
 		{
@@ -42,7 +48,6 @@ StopsForBusResponse::StopsForBusResponse(const std::string& bus, const std::vect
 				}
 			}
 		}
-		ss << std::endl;
 	}
 }
 
@@ -56,16 +61,21 @@ AllBusesResponse::AllBusesResponse()
 	ss << "No buses";
 }
 
-AllBusesResponse::AllBusesResponse(const std::map<std::string, std::vector<std::string>> buses_to_stops)
+AllBusesResponse::AllBusesResponse(const std::map<std::string, std::vector<std::string>>& buses_to_stops)
 { // все маршруты и их список остановок
+	bool first = true;
 	for (const auto& bus_item : buses_to_stops)
 	{
+		if (!first)
+		{
+			ss << std::endl;
+		}
+		first = false;
 		ss << "Bus " << bus_item.first << ": ";
 		for (const std::string& stop : bus_item.second)
 		{
 			ss << stop << " ";
 		}
-		ss << std::endl;
 	}
 }
 
