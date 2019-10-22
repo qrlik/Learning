@@ -26,7 +26,7 @@ struct AllBusesResponse
 {
 	std::stringstream ss;
 	AllBusesResponse();
-	AllBusesResponse(const std::map<std::string, std::vector<std::string>> buses_to_stops);
+	AllBusesResponse(const std::map<std::string, std::vector<std::string>>& buses_to_stops);
 };
 
 std::ostream& operator<<(std::ostream& os, const AllBusesResponse& r);
