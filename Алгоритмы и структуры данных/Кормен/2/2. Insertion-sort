@@ -1,0 +1,14 @@
+template <typename T> void insertion_sort(vector<T>& v)		// O(n^2)
+{
+	for (int i = 1; i < static_cast<int>(v.size()); ++i)	// n
+	{
+		T key = v[i];										                    // n - 1
+		int j = i - 1;										                  // n - 1
+		while (j > -1 && v[j] > key)						            // E(t) (ot j=2 do n) t - количество проверок while
+		{
+			v[j + 1] = v[j];								                  // E(t-1) (ot j=2 do n)
+			--j;											                        // E(t-1) (ot j=2 do n)
+		}
+		v[j + 1] = key;										                  // n - 1
+	}
+}
