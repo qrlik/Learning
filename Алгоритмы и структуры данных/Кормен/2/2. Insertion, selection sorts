@@ -1,0 +1,72 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <iterator>
+#include <chrono>
+#include <ctime>
+
+using namespace std;
+using namespace std::chrono;
+
+template <typename T> void insertion_sort(vector<T>& v)		// O(n^2)
+{
+	for (int i = 1; i < static_cast<int>(v.size()); ++i)	// n = size - 1;
+	{
+		T key = v[i];					// n - 1
+		int j = i - 1;					// n - 1
+		while (j > -1 && v[j] > key)			// E(t) (ot i=1 do n) t - количество проверок while
+		{
+			v[j + 1] = v[j];			// E(t-1) (ot i=1 do n)
+			--j;					// E(t-1) (ot i=1 do n)
+		}
+		v[j + 1] = key;					// n - 1
+	}
+}
+
+template <typename T> void selection_sort(vector<T>& v)		// O(n^2)
+{
+	for (size_t i = 0; i + 1 < v.size(); ++i)		// n = size - 1
+	{
+		size_t min = i;					// n - 1
+		for (size_t j = i + 1; j <v.size(); ++j)	// E(n - i + 1) (ot i = 0 do n)
+		{
+			if (v[j] < v[min])			// E(n - i) (ot i = 0 do n)
+			{
+				min = j;			// E(n - i) (ot i = 0 do n)
+			}
+		}
+		if (min != i)					// n - 1	
+		{
+			swap(v[i], v[min]);			// n - 1
+		}												
+	}
+}
+
+int main() {	
+	vector<unsigned int> ar;
+	const size_t N = 10000;
+	ar.reserve(N);
+	srand(unsigned(time(0)));
+	for (size_t i = 0; i < N; ++i)
+	{
+		ar.emplace_back(rand());
+	}
+	vector<unsigned int> ar2(ar.begin(), ar.end());
+
+	auto start = steady_clock::now();
+	insertion_sort(ar);
+	auto finish = steady_clock::now();
+	cout << duration_cast<milliseconds>(finish - start).count() << endl; // 1115
+
+	auto start2 = steady_clock::now();
+	selection_sort(ar2);
+	auto finish2 = steady_clock::now();
+	cout << duration_cast<milliseconds>(finish2 - start2).count() << endl; // 2142
+
+	//for (auto i : ar2)
+	//{
+	//	cout << i << ' ';
+	//}
+	return 0;
+}
