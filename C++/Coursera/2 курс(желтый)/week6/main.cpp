@@ -14,11 +14,7 @@ template<typename T1, typename T2> std::ostream& operator<<(std::ostream& os, co
 	return os << p.first << ' ' << p.second;
 }
 
-void TestAll();
-
 int main() {
-	TestAll();
-
 	Database db;
 
 	for (string line; getline(cin, line); ) {
