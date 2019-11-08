@@ -13,7 +13,24 @@ class TestRunner
 private:
 	int fail_count = 0; // счетчик упавших тестов
 public:
-	template <class TestFunc> void RunTest(TestFunc func, const std::string& test_name); // шаблонный запуск тестирующей функции
+	template <class TestFunc> void RunTest(TestFunc func, const std::string& test_name) // шаблонный запуск тестирующей функции
+	{
+		try
+		{
+			func();
+			std::cerr << test_name << " OK" << std::endl;
+		}
+		catch (std::exception & e)
+		{
+			++fail_count;
+			std::cerr << test_name << " fail: " << e.what() << std::endl;
+		}
+		catch (...)
+		{
+			++fail_count;
+			std::cerr << "Unknown exception caught" << std::endl;
+		}
+	}
 	~TestRunner(); // проверка на верность тестов
 };
 
