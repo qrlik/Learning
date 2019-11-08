@@ -1,0 +1,126 @@
+#include <iostream>
+#include <vector>
+#include <iterator>
+#include <tuple>
+#include <chrono>
+#include <ctime>
+
+using namespace std;
+using namespace std::chrono;
+
+template <typename It> tuple<int, It, It> max_subar_n2(It begin, It end) // O(n^2)
+{
+	if (distance(begin, end) > 0)
+	{
+		int result = INT_MIN;
+		It left, right;
+		for (; begin != end; ++begin)
+		{
+			int sum = 0;
+			for (It i = begin; i != end; ++i)
+			{
+				sum += *i;
+				if (sum > result)
+				{
+					result = sum;
+					left = begin;
+					right = next(i);
+				}
+			}
+		}
+		return make_tuple(result, left, right);
+	}
+	return make_tuple(0, begin, end);
+}
+
+template <typename It> tuple<int, It, It> max_cross_subarray(It begin, It mid, It end)
+{
+	It max_left, max_right;
+	int left_sum = INT_MIN;
+	int sum = 0;
+	for (It i = prev(mid); i != begin; --i)
+	{
+		sum += *i;
+		if (sum > left_sum)
+		{
+			left_sum = sum;
+			max_left = i;
+		}
+	} // т.к на begin не пропускаем, а как приводить от риверсивный итераторов или получить prev(begin) я не знаю допишу так
+	sum += *begin;
+	if (sum > left_sum)
+	{
+		left_sum = sum;
+		max_left = begin;
+	}
+
+	int right_sum = INT_MIN;
+	sum = 0;
+	for (It i = mid; i != end; ++i)
+	{
+		sum += *i;
+		if (sum > right_sum)
+		{
+			right_sum = sum;
+			max_right = next(i);
+		}
+	}
+	return make_tuple(left_sum + right_sum, max_left, max_right);
+}
+
+template <typename It> tuple<int, It, It> max_subarray(It begin, It end) // O(nlogn)
+{
+	if (distance(begin, end) == 1)
+	{
+		return { *begin, begin, end };
+	}
+	else if (distance(begin, end) > 1)
+	{
+		It mid = begin + distance(begin,end) / 2;
+		tuple<int, It, It> left = max_subarray(begin, mid);
+		tuple<int, It, It> right = max_subarray(mid, end);
+		tuple<int, It, It> cross = max_cross_subarray(begin, mid, end);
+		if (left >= right && left >= cross)
+		{
+			return left;
+		}
+		else if (right >= left && right >= cross)
+		{
+			return right;
+		}
+		else
+		{
+			return cross;
+		}
+	}
+	return make_tuple(0, begin, end);
+}
+
+int main() {	
+	//vector<int> ar = { 13, -3, -25, 20, -3, -16, -23, 18, 20, -7, 12, -5, -22, 15, -4, 7 };
+	vector<int> ar;
+	const size_t N = 50000;
+	ar.reserve(N);
+	srand(unsigned(time(0)));
+	for (size_t i = 0; i < N; ++i)
+	{
+		ar.emplace_back(rand() % 101 - 50);
+	}
+
+	auto start2 = steady_clock::now();
+	auto res1 = max_subar_n2(ar.begin(), ar.end());
+	auto finish2 = steady_clock::now();
+	cout << "O(N^2) : " << duration_cast<milliseconds>(finish2 - start2).count() << endl;	// 72 (1000)	7167 (10000)	179221 (50000)
+
+	auto start = steady_clock::now();
+	auto res2 = max_subarray(ar.begin(), ar.end());
+	auto finish = steady_clock::now();
+	cout << "O(NlogN) : " << duration_cast<milliseconds>(finish - start).count() << endl;	// 8  (1000)	93 (10000)		485 (50000)
+
+	cout << get<0>(res1) << endl;
+	//copy(get<1>(res1), get<2>(res1), ostream_iterator<int>(cout, " "));
+
+	cout << get<0>(res2) << endl;
+	//copy(get<1>(res2), get<2>(res2), ostream_iterator<int>(cout, " "));
+	return 0;
+}
