@@ -1,12 +1,10 @@
+#include "profile.h"
+
+#include <algorithm>
 #include <iostream>
 #include <vector>
 #include <iterator>
 #include <tuple>
-#include <chrono>
-#include <ctime>
-
-using namespace std;
-using namespace std::chrono;
 
 template <typename It> tuple<int, It, It> max_subar_n2(It begin, It end) // O(n^2)
 {
@@ -38,20 +36,15 @@ template <typename It> tuple<int, It, It> max_cross_subarray(It begin, It mid, I
 	It max_left, max_right;
 	int left_sum = INT_MIN;
 	int sum = 0;
-	for (It i = prev(mid); i != begin; --i)
+	for (It i = mid; i != begin; )
 	{
+		--i;
 		sum += *i;
 		if (sum > left_sum)
 		{
 			left_sum = sum;
 			max_left = i;
 		}
-	} // т.к на begin не пропускаем, а как приводить от риверсивный итераторов или получить prev(begin) я не знаю допишу так
-	sum += *begin;
-	if (sum > left_sum)
-	{
-		left_sum = sum;
-		max_left = begin;
 	}
 
 	int right_sum = INT_MIN;
@@ -76,7 +69,7 @@ template <typename It> tuple<int, It, It> max_subarray(It begin, It end) // O(nl
 	}
 	else if (distance(begin, end) > 1)
 	{
-		It mid = begin + distance(begin,end) / 2;
+		It mid = begin + distance(begin, end) / 2;
 		tuple<int, It, It> left = max_subarray(begin, mid);
 		tuple<int, It, It> right = max_subarray(mid, end);
 		tuple<int, It, It> cross = max_cross_subarray(begin, mid, end);
@@ -96,10 +89,34 @@ template <typename It> tuple<int, It, It> max_subarray(It begin, It end) // O(nl
 	return make_tuple(0, begin, end);
 }
 
-int main() {	
+template<typename It> tuple<int, It, It> max_subar_linear(It first, It last)
+{
+	It left = first;
+	It right = first;
+	It tmp_left = first;
+	int sum = INT_MIN;
+	int tmp_sum = 0;
+	for (; first != last; ++first)
+	{
+		tmp_sum = max(tmp_sum + *first, *first);
+		if (tmp_sum > sum)
+		{
+			sum = tmp_sum;
+			right = first;
+			left = tmp_left;
+		}
+		if (tmp_sum == *first)
+		{
+			tmp_left = first;
+		}
+	}
+	return { sum, left, right };
+}
+
+int main() {
 	//vector<int> ar = { 13, -3, -25, 20, -3, -16, -23, 18, 20, -7, 12, -5, -22, 15, -4, 7 };
 	vector<int> ar;
-	const size_t N = 50000;
+	const size_t N = 25000;
 	ar.reserve(N);
 	srand(unsigned(time(0)));
 	for (size_t i = 0; i < N; ++i)
@@ -107,20 +124,30 @@ int main() {
 		ar.emplace_back(rand() % 101 - 50);
 	}
 
-	auto start2 = steady_clock::now();
-	auto res1 = max_subar_n2(ar.begin(), ar.end());
-	auto finish2 = steady_clock::now();
-	cout << "O(N^2) : " << duration_cast<milliseconds>(finish2 - start2).count() << endl;	// 72 (1000)	7167 (10000)	179221 (50000)
+	{
+		LOG_DURATION("N^2");
+		auto res1 = max_subar_n2(ar.begin(), ar.end());
+		cout << get<0>(res1) << endl;
+	}
 
-	auto start = steady_clock::now();
-	auto res2 = max_subarray(ar.begin(), ar.end());
-	auto finish = steady_clock::now();
-	cout << "O(NlogN) : " << duration_cast<milliseconds>(finish - start).count() << endl;	// 8  (1000)	93 (10000)		485 (50000)
+	{
+		LOG_DURATION("logN");
+		auto res1 = max_subarray(ar.begin(), ar.end());
+		cout << get<0>(res1) << endl;
+	}
 
-	cout << get<0>(res1) << endl;
-	//copy(get<1>(res1), get<2>(res1), ostream_iterator<int>(cout, " "));
+	{
+		LOG_DURATION("N");
+		auto res1 = max_subar_linear(ar.begin(), ar.end());
+		cout << get<0>(res1) << endl;
+	}
 
-	cout << get<0>(res2) << endl;
-	//copy(get<1>(res2), get<2>(res2), ostream_iterator<int>(cout, " "));
+	/*
+		1000		10000		25000
+	N^2:	72 ms		7261 ms		44521 ms
+	logN:	9 ms		93 ms		238 ms
+	N:	0 ms		2 ms		5 ms
+	*/
+
 	return 0;
 }
