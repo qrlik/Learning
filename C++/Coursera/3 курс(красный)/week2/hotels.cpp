@@ -61,7 +61,7 @@ class HotelSystem
 	map<string, Hotel> hotels; // карта отелей по названию и их данные
 	uint64_t last_book_time; // последнее время бронирования
 public:
-	HotelSystem(): last_book_time(0) {}
+	HotelSystem() : last_book_time(0) {}
 
 	void book(const string& h_name, const reserve& new_rsrv)
 	{
@@ -71,22 +71,12 @@ public:
 
 	size_t clients(const string& h_name)
 	{
-		auto it = hotels.find(h_name);
-		if (it == hotels.end()) // если информации по отелю нет
-		{
-			return 0;
-		}
-		return it->second.day_clients(last_book_time); // количество клиентов за сутки от последней брони
+		return hotels[h_name].day_clients(last_book_time); // количество клиентов за сутки от последней брони
 	}
 
 	int64_t rooms(const string& h_name)
 	{
-		auto it = hotels.find(h_name);
-		if (it == hotels.end()) // если информации по отелю нет
-		{
-			return 0;
-		}
-		return it->second.day_rooms(last_book_time); // количество клиентов за сутки от последней брони
+		return hotels[h_name].day_rooms(last_book_time);  // количество клиентов за сутки от последней брони
 	}
 };
 
