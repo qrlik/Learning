@@ -19,15 +19,20 @@ struct reserve
 class Hotel
 {
 	queue<reserve> reserves; // все бронирования за последние сутки
-	set<int> clients_24; // список клиентов за последние сутки
+	map<int, int> clients_24; // список клиентов и количество их бронирований
 	int64_t rooms_24; // количество забронированных комнат за последние сутки
 
-	void adjust(int64_t time)
+	void adjust(int64_t time)	// O(logQ) - максимум Q клиентов
 	{ // удаление всех старых записей
 		while (!reserves.empty() && time - 86400 >= reserves.front().time) // пока очередь не пуста удаляем все записи старше суток
 		{
-			rooms_24 -= reserves.front().rooms; // вычитаем комнаты из счетчика
-			clients_24.erase(reserves.front().client_id); // удаляем клиента из множества
+			const reserve& front_rsrv = reserves.front();
+			rooms_24 -= front_rsrv.rooms; // вычитаем комнаты из счетчика
+			const auto last_client_it = clients_24.find(front_rsrv.client_id); // ищем нужного клиента
+			if (--last_client_it->second == 0) // уменьшаем счетчик бронирований
+			{ // если бронирований за последние сутки больше нет - удаляем
+				clients_24.erase(last_client_it);
+			}
 			reserves.pop();
 		}
 	}
@@ -37,9 +42,8 @@ public:
 
 	void make_reserve(const reserve& new_rsrv) // сделать запись о бронировании
 	{
-		adjust(new_rsrv.time); // удаление записей которым больше суток
 		rooms_24 += new_rsrv.rooms; // добавляем комнаты в счетчик
-		clients_24.insert(new_rsrv.client_id); // добавляем клиента в множество
+		++clients_24[new_rsrv.client_id]; // добавляем клиента в множество
 		reserves.push(new_rsrv); // добавляем новую запись в очередь
 	}
 
@@ -63,13 +67,13 @@ class HotelSystem
 public:
 	HotelSystem() : last_book_time(0) {}
 
-	void book(const string& h_name, const reserve& new_rsrv)
+	void book(const string& h_name, const reserve& new_rsrv) // L * log(Q) + log(Q)
 	{
 		last_book_time = new_rsrv.time; // обновляем последнее время брони
 		hotels[h_name].make_reserve(new_rsrv); // обновляем данные для отеля
 	}
 
-	size_t clients(const string& h_name)
+	size_t clients(const string& h_name) 
 	{
 		return hotels[h_name].day_clients(last_book_time); // количество клиентов за сутки от последней брони
 	}
@@ -92,7 +96,7 @@ int main() {
 	int query_count; // максимум 10^5 запросов
 	cin >> query_count;
 
-	for (int query_id = 0; query_id < query_count; ++query_id)
+	for (int query_id = 0; query_id < query_count; ++query_id) // O(Q * L * log(Q)) - Q количество запросов, L - длина строки
 	{
 		string command_type;
 		cin >> command_type;
