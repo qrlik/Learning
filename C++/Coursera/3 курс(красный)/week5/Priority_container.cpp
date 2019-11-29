@@ -6,32 +6,37 @@
 #include <memory>
 #include <map>
 #include <utility>
-#include <vector>
+#include <deque>
 #include <list>
 
 using namespace std;
 
 template <typename T> class PriorityCollection
 {
+public:
 	using Id = size_t;
 	using Priority = size_t;
-
-	using Obj_list = list<T>;
+private:
+	struct Object
+	{
+		T data;
+		Id index;
+	};
 	struct Obj_info
 	{
 		Priority obj_priority;
-		typename list<T>::iterator obj_it;
+		typename list<Object>::iterator obj_it;
 	};
-
+	using Obj_list = list<Object>;
 	// Приватные поля и методы
-	vector<Obj_list> collection; // приоритет - список элементов
+	deque<Obj_list> collection; // приоритет - список элементов
 	vector<Obj_info> objects; // id - итератор на элемент
 	// после PopMax возникнут места с нулевыми итераторами, куда можно вставлять новые. для хранения таких индексов можно ввести доп. структуру (очередь например)
 public:
 	PriorityCollection() : collection(1) {} // сразу создадим нулевой приоритет
 	Id Add(T object)
 	{ // Добавить объект с нулевым приоритетом с помощью перемещения и вернуть его идентификатор
-		auto it = collection[0].insert(collection[0].end(), move(object)); // вставляем в конец новый элемент
+		auto it = collection[0].insert(collection[0].end(), { move(object), objects.size() }); // вставляем в конец новый элемент
 		objects.push_back({ 0, it }); // вставляем нулевой приоритет и итератор
 		return objects.size() - 1; // возвращаем индекс для вектора
 	}
@@ -48,9 +53,9 @@ public:
 	{ // Определить, принадлежит ли идентификатор какому-либо хранящемуся в контейнере объекту
 		try
 		{
-			return objects.at(id).obj_it != nullptr;
+			return objects.at(id).obj_it != collection[0].end();
 		}
-		catch (out_of_range& ex)
+		catch (out_of_range & ex)
 		{
 			return false;
 		}
@@ -59,7 +64,7 @@ public:
 	// Методы Get и Promote всегда вызываются от валидных с точки зрения метода IsValid идентификаторов
 	const T& Get(Id id) const
 	{ // Получить объект по идентификатору
-		return *objects[id].obj_it;
+		return (*objects[id].obj_it).data;
 	}
 
 	void Promote(Id id)
@@ -68,7 +73,7 @@ public:
 		Priority new_priority = old_priority + 1;
 		if (collection.size() == new_priority) // если размер вектора заполнен
 		{ // добавляем новый приоритет, если такого не было
-			collection.emplace_back();
+			collection.resize(new_priority + 1);
 		}
 		auto& it = objects[id].obj_it; // получили текущий итератор (по ссылке чтобы потом поменять)
 		auto new_it = collection[new_priority].insert(collection[new_priority].end(), move(*it)); // перенесли объект в список
@@ -80,15 +85,17 @@ public:
 	// Методы GetMax и PopMax вызываются только при наличии элементов в контейнере
 	pair<const T&, int> GetMax() const
 	{ // Получить объект с максимальным приоритетом и его приоритет
-		return { collection.back().back(), collection.size() - 1 };
+		return { collection.back().back().data, collection.size() - 1 };
 	}
 
 	// Аналогично GetMax, но удаляет элемент из контейнера
 	pair<T, int> PopMax()
 	{
-		pair<T, int> result(move(collection.back().back()), collection.size() - 1);
-		while (collection.back().empty())
-		{ // удаляем все последние пустые списки которые могли образоваться
+		pair<T, int> result(move(collection.back().front().data), collection.size() - 1);
+		objects[collection.back().front().index].obj_it = collection[0].end();
+		collection.back().pop_front();
+		while (collection.size() > 1 && collection.back().empty())
+		{ // удаляем все последние пустые списки которые могли образоваться кроме нулевого приоритета
 			collection.pop_back();
 		}
 		return result;
@@ -99,10 +106,7 @@ public:
 class StringNonCopyable : public string {
 public:
 	using string::string;  // Позволяет использовать конструкторы строки
-	StringNonCopyable(const StringNonCopyable&)
-	{
-		cout << "WTF" << endl;
-	}
+	StringNonCopyable(const StringNonCopyable&) = delete;
 	StringNonCopyable(StringNonCopyable&&) = default;
 	StringNonCopyable& operator=(const StringNonCopyable&) = delete;
 	StringNonCopyable& operator=(StringNonCopyable&&) = default;
