@@ -1,15 +1,13 @@
-#include "test_runner.h"
-
 #include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <memory>
 #include <map>
+#include <set>
 #include <utility>
-#include <deque>
-#include <list>
 
 using namespace std;
+
 
 template <typename T> class PriorityCollection
 {
@@ -17,131 +15,72 @@ public:
 	using Id = size_t;
 	using Priority = size_t;
 private:
-	struct Object
+	struct Data
 	{
-		T data;
-		Id index;
+		T _data;
+		Priority _priority;
 	};
-	struct Obj_info
-	{
-		Priority obj_priority;
-		typename list<Object>::iterator obj_it;
-	};
-	using Obj_list = list<Object>;
+
 	// Приватные поля и методы
-	deque<Obj_list> collection; // приоритет - список элементов
-	vector<Obj_info> objects; // id - итератор на элемент
-	// после PopMax возникнут места с нулевыми итераторами, куда можно вставлять новые. для хранения таких индексов можно ввести доп. структуру (очередь например)
+	size_t id_count;
+	map<Priority, set<Id>> collection; // сортировка по приоритету и по добавлению
+	map<Id, Data> objects; // key - id, value - данные T и Priority(для метода Promote)
 public:
-	PriorityCollection() : collection(1) {} // сразу создадим нулевой приоритет
+	PriorityCollection() : id_count(0) {}
 	Id Add(T object)
 	{ // Добавить объект с нулевым приоритетом с помощью перемещения и вернуть его идентификатор
-		auto it = collection[0].insert(collection[0].end(), { move(object), objects.size() }); // вставляем в конец новый элемент
-		objects.push_back({ 0, it }); // вставляем нулевой приоритет и итератор
-		return objects.size() - 1; // возвращаем индекс для вектора
+		objects[id_count] = { move(object), 0 }; 
+		collection[0].insert(id_count);
+		return id_count++; // возвращаем индекс и увеличиваем счетчик
 	}
 
 	template <typename ObjInputIt, typename IdOutputIt> void Add(ObjInputIt range_begin, ObjInputIt range_end, IdOutputIt ids_begin)
 	{ // Добавить все элементы диапазона [range_begin, range_end) с помощью перемещения, записав выданные им идентификаторы в диапазон [ids_begin, ...)
 		for (; range_begin != range_end; ++range_begin)
 		{
-			*ids_begin++ = Add(move(*(range_begin)));
+			*ids_begin++ = Add(move(*range_begin));
 		}
 	}
 
 	bool IsValid(Id id) const
 	{ // Определить, принадлежит ли идентификатор какому-либо хранящемуся в контейнере объекту
-		try
-		{
-			return objects.at(id).obj_it != collection[0].end();
-		}
-		catch (out_of_range & ex)
-		{
-			return false;
-		}
+		return objects.count(id) == 1;
 	}
 
 	// Методы Get и Promote всегда вызываются от валидных с точки зрения метода IsValid идентификаторов
 	const T& Get(Id id) const
 	{ // Получить объект по идентификатору
-		return (*objects[id].obj_it).data;
+		return objects.at(id)._data;
 	}
 
 	void Promote(Id id)
 	{ // Увеличить приоритет объекта на 1
-		Priority& old_priority = objects[id].obj_priority;  // получили текущий приоритет (по ссылке чтобы потом поменять)
-		Priority new_priority = old_priority + 1;
-		if (collection.size() == new_priority) // если размер вектора заполнен
-		{ // добавляем новый приоритет, если такого не было
-			collection.resize(new_priority + 1);
-		}
-		auto& it = objects[id].obj_it; // получили текущий итератор (по ссылке чтобы потом поменять)
-		auto new_it = collection[new_priority].insert(collection[new_priority].end(), move(*it)); // перенесли объект в список
-		collection[old_priority].erase(it); // удалили старый (пустой) объект
-		it = new_it; // заменили итератор
-		++old_priority; // увеличили приоритет
+		Priority& pr = objects[id]._priority; // старый приоритет
+		collection[pr].erase(id); // удалили из старого множества
+		collection[++pr].insert(id); // добавили в новое и увеличили приоритет
 	}
 
 	// Методы GetMax и PopMax вызываются только при наличии элементов в контейнере
 	pair<const T&, int> GetMax() const
-	{ // Получить объект с максимальным приоритетом и его приоритет
-		return { collection.back().back().data, collection.size() - 1 };
+	{ // Получить объект с максимальным приоритетом и его приоритет (если таких несколько, получить самый свежий)
+		const Data& result = objects.at(*collection.rbegin()->second.rbegin()); // у наивысшего приоритета, взяли последний индекс во множестве и по нему получили данные в objects
+		return { result._data, result._priority };
 	}
 
 	// Аналогично GetMax, но удаляет элемент из контейнера
 	pair<T, int> PopMax()
 	{
-		pair<T, int> result(move(collection.back().front().data), collection.size() - 1);
-		objects[collection.back().front().index].obj_it = collection[0].end();
-		collection.back().pop_front();
-		while (collection.size() > 1 && collection.back().empty())
-		{ // удаляем все последние пустые списки которые могли образоваться кроме нулевого приоритета
-			collection.pop_back();
+		Id index = *collection.rbegin()->second.rbegin(); // индекс максимального объекта
+		Data& max_data = objects[index]; // ссылка на данные
+		pair<T, int> result_data(move(max_data._data), max_data._priority); // переносим в локальную переменную
+
+		collection[max_data._priority].erase(index);
+		while (!collection.empty() && collection.rbegin()->second.empty())
+		{ // т.к после удаления максимума может возникнуть хвост из пустных множеств, нужно удалить лишние ключи
+			collection.erase(--collection.end());
 		}
-		return result;
+
+		objects.erase(index);
+		return result_data;
 	}
 };
-
-
-class StringNonCopyable : public string {
-public:
-	using string::string;  // Позволяет использовать конструкторы строки
-	StringNonCopyable(const StringNonCopyable&) = delete;
-	StringNonCopyable(StringNonCopyable&&) = default;
-	StringNonCopyable& operator=(const StringNonCopyable&) = delete;
-	StringNonCopyable& operator=(StringNonCopyable&&) = default;
-};
-
-void TestNoCopy() {
-	PriorityCollection<StringNonCopyable> strings;
-	const auto white_id = strings.Add("white");
-	const auto yellow_id = strings.Add("yellow");
-	const auto red_id = strings.Add("red");
-
-	strings.Promote(yellow_id);
-	for (int i = 0; i < 2; ++i) {
-		strings.Promote(red_id);
-	}
-	strings.Promote(yellow_id);
-	{
-		const auto item = strings.PopMax();
-		ASSERT_EQUAL(item.first, "red");
-		ASSERT_EQUAL(item.second, 2);
-	}
-	{
-		const auto item = strings.PopMax();
-		ASSERT_EQUAL(item.first, "yellow");
-		ASSERT_EQUAL(item.second, 2);
-	}
-	{
-		const auto item = strings.PopMax();
-		ASSERT_EQUAL(item.first, "white");
-		ASSERT_EQUAL(item.second, 0);
-	}
-}
-
-int main() {
-	TestRunner tr;
-	RUN_TEST(tr, TestNoCopy);
-	return 0;
-}
