@@ -2,8 +2,9 @@
 #include "profile.h"
 
 #include <map>
-#include <string>
 #include <set>
+#include <string>
+#include <sstream>
 #include <future>
 #include <algorithm>
 #include <functional>
@@ -23,49 +24,48 @@ struct Stats
 	}
 };
 
-//вариант от менторов
-//vector<string> Split(const string& line)
-//{
-//	istringstream line_splitter(line);
-//	return { istream_iterator<string>(line_splitter), istream_iterator<string>() };
-//}
-//
-//Stats ExploreLine(const set<string>& key_words, const string& line)
-//{
-//	Stats result;
-//	for (const string& word : Split(line)) {
-//		if (key_words.count(word) > 0) {
-//			result.word_frequences[word]++;
-//		}
-//	}
-//	return result;
-//}
-
+//вариант от менторов, но тут копирование в istringstream, а потом еще копирование в vector (выходит 3 копирования вместо двух, возможно можно как-то c make_move_iterator)
+vector<string> Split(const string& line)
+{
+	istringstream line_splitter(line);
+	return { istream_iterator<string>(line_splitter), istream_iterator<string>() };
+}
 
 Stats ExploreLine(const set<string>& key_words, const string& line)
 {
 	Stats result;
-
-	for (size_t not_space = line.find_first_not_of(' '); not_space != line.npos; )
-	{
-		size_t space = line.find_first_of(' ', not_space); // находим первый пробел (конец слова)
-
-		string word = line.substr(not_space, space - not_space); // 2 копирование
-		if (key_words.find(word) != key_words.end())
-		{
-			++result.word_frequences[move(word)]; // заносим слово в словарь
+	for (const string& word : Split(line)) {
+		if (key_words.count(word) > 0) {
+			result.word_frequences[word]++;
 		}
-
-		not_space = line.find_first_not_of(' ', space); // ищем начало следующего слова
 	}
-
 	return result;
 }
+//
+//Stats ExploreLine(const set<string>& key_words, const string& line)
+//{
+//	Stats result;
+//
+//	for (size_t not_space = line.find_first_not_of(' '); not_space != line.npos; )
+//	{
+//		size_t space = line.find_first_of(' ', not_space); // находим первый пробел (конец слова)
+//
+//		string word = line.substr(not_space, space - not_space); // 2 копирование
+//		if (key_words.find(word) != key_words.end())
+//		{
+//			++result.word_frequences[move(word)]; // заносим слово в словарь
+//		}
+//
+//		not_space = line.find_first_not_of(' ', space); // ищем начало следующего слова
+//	}
+//
+//	return result;
+//}
 
-Stats ExploreKeyWordsSingleThread(const set<string>& key_words, vector<string> buffer)
+Stats ExploreKeyWordsSingleThread(const set<string>& key_words, stringstream input)
 {
 	Stats result;
-	for (const string& line : buffer) // для каждой строки в буффере выполняем поиск ключевых слов
+	for (string line; getline(input, line); ) // для каждой строки в буффере выполняем поиск ключевых слов
 	{
 		result += ExploreLine(key_words, line);
 	}
@@ -74,30 +74,28 @@ Stats ExploreKeyWordsSingleThread(const set<string>& key_words, vector<string> b
 
 Stats ExploreKeyWords(const set<string>& key_words, istream& input)
 {
+	Stats result;
 	vector<future<Stats>> futures;
-	vector<string> buffer; // буффер строк
-	const size_t buffer_size = 10000;
-	buffer.reserve(buffer_size); // буффер считывания строк
+	stringstream buffer;
 
 	while (input)
 	{
 		string line;
-		for (size_t i = 0; i < buffer_size && getline(input, line); )
-		{
-			buffer.push_back(move(line));
+		for (size_t i = 0; i < 5000 && getline(input, line); ++i) // 1 копирование в буффер
+		{ // Заполняем буффер строками
+			buffer << line << '\n';
 		}
-		futures.push_back(async(ExploreKeyWordsSingleThread, ref(key_words), move(buffer)));
-		buffer.reserve(buffer_size); // снова резервируем память
+		futures.push_back(async(ExploreKeyWordsSingleThread, ref(key_words), move(buffer))); // создаем потоки для обработки буфферов
 	}
 
-	Stats result;
 	for (auto& f : futures)
-	{ // суммируем результаты потоков
-		result += f.get();
+	{
+		result += f.get(); // суммируем результаты
 	}
 
 	return result;
 }
+
 
 void TestBasic() {
 	const set<string> key_words = { "yangle", "rocks", "sucks", "all" };
