@@ -2,9 +2,8 @@
 #include "profile.h"
 
 #include <map>
-#include <set>
 #include <string>
-#include <sstream>
+#include <set>
 #include <future>
 #include <algorithm>
 #include <functional>
@@ -24,7 +23,7 @@ struct Stats
 	}
 };
 
-//вариант от менторов, но тут копирование в istringstream, а потом еще копирование в vector (выходит 3 копирования вместо двух, возможно можно как-то c make_move_iterator)
+//вариант от менторов, но тут копирование в istringstream, а потом еще копирование в vector
 vector<string> Split(const string& line)
 {
 	istringstream line_splitter(line);
@@ -41,6 +40,7 @@ Stats ExploreLine(const set<string>& key_words, const string& line)
 	}
 	return result;
 }
+
 //
 //Stats ExploreLine(const set<string>& key_words, const string& line)
 //{
@@ -62,10 +62,10 @@ Stats ExploreLine(const set<string>& key_words, const string& line)
 //	return result;
 //}
 
-Stats ExploreKeyWordsSingleThread(const set<string>& key_words, stringstream input)
+Stats ExploreKeyWordsSingleThread(const set<string>& key_words, vector<string> buffer)
 {
 	Stats result;
-	for (string line; getline(input, line); ) // для каждой строки в буффере выполняем поиск ключевых слов
+	for (const string& line : buffer) // для каждой строки в буффере выполняем поиск ключевых слов
 	{
 		result += ExploreLine(key_words, line);
 	}
@@ -74,28 +74,30 @@ Stats ExploreKeyWordsSingleThread(const set<string>& key_words, stringstream inp
 
 Stats ExploreKeyWords(const set<string>& key_words, istream& input)
 {
-	Stats result;
 	vector<future<Stats>> futures;
-	stringstream buffer;
+	vector<string> buffer; // буффер строк
+	const size_t buffer_size = 10000;
+	buffer.reserve(buffer_size); // буффер считывания строк
 
 	while (input)
 	{
 		string line;
-		for (size_t i = 0; i < 5000 && getline(input, line); ++i) // 1 копирование в буффер
+		for (size_t i = 0; i < buffer_size && getline(input, line); ++i)
 		{ // Заполняем буффер строками
-			buffer << line << '\n';
+			buffer.push_back(move(line));
 		}
 		futures.push_back(async(ExploreKeyWordsSingleThread, ref(key_words), move(buffer))); // создаем потоки для обработки буфферов
+		buffer.reserve(buffer_size); // снова резервируем память
 	}
 
+	Stats result;
 	for (auto& f : futures)
-	{
-		result += f.get(); // суммируем результаты
+	{ // суммируем результаты потоков
+		result += f.get();
 	}
 
 	return result;
 }
-
 
 void TestBasic() {
 	const set<string> key_words = { "yangle", "rocks", "sucks", "all" };
