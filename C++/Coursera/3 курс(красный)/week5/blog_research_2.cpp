@@ -22,12 +22,12 @@ struct Stats
 		}
 	}
 };
-
-//вариант от менторов
+//
+////вариант от менторов, но тут копирование в istringstream, а потом еще копирование в vector (выходит 3 копирования вместо двух, возможно можно как-то c make_move_iterator)
 //vector<string> Split(const string& line)
 //{
 //	istringstream line_splitter(line);
-//	return { istream_iterator<string>(line_splitter), istream_iterator<string>() };
+//	return { make_move_iterator(istream_iterator<string>(line_splitter)), make_move_iterator(istream_iterator<string>()) };
 //}
 //
 //Stats ExploreLine(const set<string>& key_words, const string& line)
@@ -79,18 +79,22 @@ Stats ExploreKeyWords(const set<string>& key_words, istream& input)
 	const size_t buffer_size = 10000;
 	buffer.reserve(buffer_size); // буффер считывания строк
 
-	while (input)
+	for (string line; getline(input, line);)
 	{
-		string line;
-		for (size_t i = 0; i < buffer_size && getline(input, line); )
+		buffer.push_back(move(line));
+		if (buffer.size() >= buffer_size) // как заполнили, отправляем в поток
 		{
-			buffer.push_back(move(line));
+			futures.push_back(async(ExploreKeyWordsSingleThread, ref(key_words), move(buffer)));
+			buffer.reserve(buffer_size); // снова резервируем память
 		}
-		futures.push_back(async(ExploreKeyWordsSingleThread, ref(key_words), move(buffer)));
-		buffer.reserve(buffer_size); // снова резервируем память
 	}
 
 	Stats result;
+	if (!buffer.empty())
+	{ // забираем хвост
+		result += ExploreKeyWordsSingleThread(key_words, move(buffer));
+	}
+
 	for (auto& f : futures)
 	{ // суммируем результаты потоков
 		result += f.get();
