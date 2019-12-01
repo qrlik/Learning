@@ -8,6 +8,8 @@
 #include <future>
 #include <algorithm>
 #include <functional>
+#include <iterator>
+
 using namespace std;
 
 struct Stats
@@ -23,7 +25,25 @@ struct Stats
 	}
 };
 
-Stats ExploreLine(const set<string>& key_words, const string& line)
+////вариант от менторов, элегантней, но медленней. из-за лишнего копирования
+//vector<string> Split(const string& line)
+//{
+//	istringstream line_splitter(line);
+//	return { istream_iterator<string>(line_splitter), istream_iterator<string>() };
+//}
+//
+//Stats ExploreLine(const set<string>& key_words, const string& line)
+//{
+//	Stats result;
+//	for (const string& word : Split(line)) {
+//		if (key_words.count(word) > 0) {
+//			result.word_frequences[word]++;
+//		}
+//	}
+//	return result;
+//}
+
+Stats ExploreLine(const set<string>& key_words, const string& line) // вручную, работает быстрее, можно расширить маску разделителя
 {
 	Stats result;
 
@@ -43,7 +63,7 @@ Stats ExploreLine(const set<string>& key_words, const string& line)
 	return result;
 }
 
-Stats ExploreKeyWordsSingleThread(const set<string>& key_words, istream& input)
+Stats ExploreKeyWordsSingleThread(const set<string>& key_words, stringstream input)
 {
 	Stats result;
 	for (string line; getline(input, line); ) // для каждой строки в буффере выполняем поиск ключевых слов
@@ -57,22 +77,17 @@ Stats ExploreKeyWords(const set<string>& key_words, istream& input)
 {
 	Stats result;
 	vector<future<Stats>> futures;
-	vector<stringstream> buffers;
+	stringstream buffer; // в решение менторов vector<string>, без двух getline и << '\n', но с двумя reserve под buffer_size
+	const size_t buffer_size = 10000;
 
 	while (input)
 	{
 		string line;
-		stringstream ss;
-		for (size_t i = 0; i < 10000 && getline(input, line); ++i) // 1 копирование в буффер
+		for (size_t i = 0; i < buffer_size && getline(input, line); ++i) // заполняем буффер
 		{ // Заполняем буффер строками
-			ss << line << '\n';
+			buffer << line << '\n';
 		}
-		buffers.push_back(move(ss)); // заполняем вектор буфферов
-	}
-
-	for (auto& buffer : buffers)
-	{
-		futures.push_back(async(ExploreKeyWordsSingleThread, ref(key_words), ref(buffer))); // создаем потоки для обработки буфферов
+		futures.push_back(async(ExploreKeyWordsSingleThread, ref(key_words), move(buffer))); // создаем потоки для обработки буфферов
 	}
 
 	for (auto& f : futures)
