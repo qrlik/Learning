@@ -28,7 +28,9 @@ public:
 
 class SearchServer
 { // класс поисковой системы
-	Synchronized<Database> data; // Database о оболочке с синхронным доступом
+	Database data; // Database о оболочке с синхронным доступом
+	mutex dmutex;
+	mutex updmutex;
 	vector<future<void>> update_futures;
 	void UpdateDocumentBaseThread(istream& document_input);
 	ostringstream AddQueriesStreamSingleThread(vector<string> query_input);
