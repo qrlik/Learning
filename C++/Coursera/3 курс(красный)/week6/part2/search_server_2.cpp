@@ -83,13 +83,9 @@ void SearchServer::AddQueriesStreamThread(istream& query_input, ostream& search_
 	{
 		vector<string> query_words = SplitLine(current_query); //вектор слов из запроса
 
+		if (search_count.GetAccess().ref_to_value++ == 0) // первый поток блокирует доступ к данным
 		{
-			auto count_access = search_count.GetAccess(); 
-			if (count_access.ref_to_value == 0) // если нет потоков считывающих данные блокируем mutex
-			{
-				dmutex.lock();
-			}
-			++count_access.ref_to_value; // увеличиваем счетчик потоков работающих с базой
+			dmutex.lock();
 		}
 
 		docid_count.assign(data.size(), make_pair(0, 0)); // делаем нулевую маску по размеру базы
@@ -110,13 +106,9 @@ void SearchServer::AddQueriesStreamThread(istream& query_input, ostream& search_
 			}
 		}
 
+		if (--search_count.GetAccess().ref_to_value == 0) // если все потоки закончили поиск, снимаем блокировку данных
 		{
-			auto count_access = search_count.GetAccess();
-			--count_access.ref_to_value; // уменьшаем счетчик потоков
-			if (count_access.ref_to_value == 0) // если данные не используются, снимаем блокировку
-			{
-				dmutex.unlock();
-			}
+			dmutex.unlock();
 		}
 
 		auto lambda = [](pair<size_t, int> lhs, pair<size_t, int> rhs) // сортируем по убыванию hitcount и возрастанию doc_id
