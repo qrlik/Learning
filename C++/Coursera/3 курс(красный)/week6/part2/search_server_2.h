@@ -33,8 +33,7 @@ class SearchServer
 
 	Synchronized<size_t> search_count; // счетчик потоков в поиске
 
-	vector<future<void>> update_futures;
-	vector<future<void>> search_futures;
+	vector<future<void>> server_futures;
 
 	void UpdateDocumentBaseThread(istream& document_input);
 	void AddQueriesStreamThread(istream& query_input, ostream& search_results_output);
