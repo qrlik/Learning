@@ -46,6 +46,7 @@ SearchServer::SearchServer(istream& document_input)
 
 void SearchServer::UpdateDocumentBaseThread(istream& document_input) // обновление базы документов (максимум 5*10^4 штук)
 {
+	lock_guard update_guard(updmutex); // позволяем только 1 обновление базы за раз
 	Database new_data;
 	for (string current_document; getline(document_input, current_document); ) // конструируем новый Database без mutex
 	{
@@ -54,45 +55,46 @@ void SearchServer::UpdateDocumentBaseThread(istream& document_input) // обно
 			new_data.Add(current_document);
 		}
 	}
-	data.GetAccess().ref_to_value = move(new_data); // получили доступ к данным и заменили
+
+	lock_guard search_guard(dmutex); // ждем завершения поиска
+	data = move(new_data); // обновляем данные
 }
 
 void SearchServer::UpdateDocumentBase(istream& document_input) // обновление базы документов (максимум 5*10^4 штук)
 {
-	update_futures.push_back(async(&SearchServer::UpdateDocumentBaseThread, this, ref(document_input)));
+	if (data.size() == 0)
+	{
+		UpdateDocumentBaseThread(document_input);
+	}
+	else
+	{
+		update_futures.push_back(async(&SearchServer::UpdateDocumentBaseThread, this, ref(document_input)));
+	}
 }
 
 ostringstream SearchServer::AddQueriesStreamSingleThread(vector<string> query_input)
 {
 	ostringstream search_results_output;
-	vector<pair<size_t, int>> docid_count; // счетчик hitcount для всех документов <hitcount, docid>
-	size_t relevant_size;
-	
+	vector<pair<size_t, int>> docid_count(data.size(), make_pair(0, 0)); // счетчик hitcount для всех документов <hitcount, docid>
+	size_t relevant_size = min(static_cast<size_t>(5), docid_count.size());
+
 	for (const string& current_query : query_input) // получили запрос
 	{
 		vector<string> query_words = SplitLine(current_query); //вектор слов из запроса
 
+		for (const auto& word : query_words) // для каждого слова в запросе
 		{
-			auto data_access = data.GetAccess();  // получили доступ к данным
-			const Database& data_ref = data_access.ref_to_value;
-
-			docid_count.assign(data_ref.size(), make_pair(0, 0)); // обнуляем значения в векторе
-			relevant_size = min(static_cast<size_t>(5), docid_count.size());
-
-			for (const auto& word : query_words) // для каждого слова в запросе
-			{
-				try
-				{ // проверяем есть ли слово в базе
-					for (auto [docid, hits] : data_ref.Lookup(word)) // забираем информацию из id_hits
-					{
-						docid_count[docid].first += hits;
-						docid_count[docid].second = docid;
-					}
-				}
-				catch (out_of_range&)
+			try
+			{ // проверяем есть ли слово в базе
+				for (auto [docid, hits] : data.Lookup(word)) // забираем информацию из id_hits
 				{
-					continue;
+					docid_count[docid].first += hits;
+					docid_count[docid].second = docid;
 				}
+			}
+			catch (out_of_range&)
+			{
+				continue;
 			}
 		}
 
@@ -113,18 +115,20 @@ ostringstream SearchServer::AddQueriesStreamSingleThread(vector<string> query_in
 				<< "hitcount: " << docid_count[i].first << '}';
 		}
 		search_results_output << '\n';
-	}
 
+		docid_count.assign(data.size(), make_pair(0, 0)); // обнуляем значения в векторе
+	}
 	return search_results_output;
 }
 
 void SearchServer::AddQueriesStream(istream& query_input, ostream& search_results_output)
 {
 	vector<future<ostringstream>> futures;
-	const size_t buffer_size = 4000;
+	const size_t buffer_size = 1000;
 	vector<string> buffer;
 	buffer.reserve(buffer_size);
 
+	dmutex.lock();
 	while (query_input)
 	{
 		string query;
@@ -140,4 +144,5 @@ void SearchServer::AddQueriesStream(istream& query_input, ostream& search_result
 	{
 		search_results_output << f.get().str(); // получаем результаты
 	}
+	dmutex.unlock();
 }
