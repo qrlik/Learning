@@ -30,7 +30,15 @@ void Database::Add(const string& document) // получает документ 
 
 const vector<pair<size_t, size_t>>& Database::Lookup(const string& word) const
 {
-	return letter_words.at(word).id_hits;
+	if (auto it = letter_words.find(word); it != letter_words.end())
+	{
+		return it->second.id_hits;
+	}
+	else
+	{
+		static const vector<pair<size_t, size_t>> empty;
+		return empty;
+	}
 }
 
 size_t Database::size() const
@@ -70,7 +78,7 @@ void SearchServer::UpdateDocumentBase(istream& document_input) // обновле
 	}
 	else
 	{
-		update_futures.push_back(async(&SearchServer::UpdateDocumentBaseThread, this, ref(document_input)));
+		server_futures.push_back(async(&SearchServer::UpdateDocumentBaseThread, this, ref(document_input)));
 	}
 }
 
@@ -92,17 +100,10 @@ void SearchServer::AddQueriesStreamThread(istream& query_input, ostream& search_
 		relevant_size = min(static_cast<size_t>(5), docid_count.size()); // до 5 релевантных документов
 		for (const auto& word : query_words) // для каждого слова в запросе
 		{
-			try
-			{ // проверяем есть ли слово в базе
-				for (auto [docid, hits] : data.Lookup(word)) // забираем информацию из id_hits
-				{
-					docid_count[docid].first += hits;
-					docid_count[docid].second = docid;
-				}
-			}
-			catch (out_of_range&)
+			for (auto [docid, hits] : data.Lookup(word)) // забираем информацию из id_hits
 			{
-				continue;
+				docid_count[docid].first += hits;
+				docid_count[docid].second = docid;
 			}
 		}
 
@@ -133,5 +134,5 @@ void SearchServer::AddQueriesStreamThread(istream& query_input, ostream& search_
 
 void SearchServer::AddQueriesStream(istream& query_input, ostream& search_results_output)
 { // отправляем поиск в отдельный поток
-	search_futures.push_back(async(&SearchServer::AddQueriesStreamThread, this, ref(query_input), ref(search_results_output)));
+	server_futures.push_back(async(&SearchServer::AddQueriesStreamThread, this, ref(query_input), ref(search_results_output)));
 }
