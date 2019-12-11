@@ -16,9 +16,8 @@ struct Record
     int karma;
 };
 
-struct SecondIndex
+struct SecondIndexIt
 { // структура для хранения указателя и итераторов, для быстрой работы функций
-    const Record* record;
     multimap<int, const Record*>::iterator timestamp;
     multimap<int, const Record*>::iterator karma;
     multimap<string, const Record*>::iterator user;
@@ -28,7 +27,7 @@ struct SecondIndex
 class Database
 {
     unordered_map<string, Record> data; // id - Records
-    unordered_map<string, SecondIndex> ids; // словарь по id с быстрым доступом к данным
+    unordered_map<string, SecondIndexIt> ids; // словарь по id с быстрым доступом к данным
     multimap<int, const Record*> timestamp_si; // вторичный индекс для timestamp
     multimap<int, const Record*> karma_si; // вторичный индекс для karma
     multimap<string, const Record*> user_si; // вторичный индекс для user_si
@@ -49,10 +48,11 @@ public:
         auto [it, is_insert] = data.emplace(record.id, record); // пробуем вставить пару
         if (is_insert)
         { // вставка произошла, нужно обновить данные
-            auto time_it = timestamp_si.emplace(record.timestamp, &it->second); // обновляем индексы
-            auto karma_it = karma_si.emplace(record.karma, &it->second);
-            auto user_it = user_si.emplace(record.user, &it->second);
-            SecondIndex tmp { &it->second, time_it, karma_it, user_it };
+        	const Record* ptr = &it->second;
+            auto time_it = timestamp_si.emplace(record.timestamp, ptr); // обновляем индексы
+            auto karma_it = karma_si.emplace(record.karma, ptr);
+            auto user_it = user_si.emplace(record.user, ptr);
+            SecondIndexIt tmp { time_it, karma_it, user_it };
             ids.emplace(record.id, move(tmp));
         }
         return is_insert;
@@ -60,11 +60,11 @@ public:
 
     const Record* GetById(const string& id) const // Операция GetById должна возвращать nullptr, если в базе данных нет записи с указанным id
     {
-        try
+        if (auto it = data.find(id); it != data.end())
         {
-            return &data.at(id);
+            return &it->second;
         }
-        catch (out_of_range&)
+        else
         {
             return nullptr;
         }
@@ -76,9 +76,10 @@ public:
         if (result)
         { // если удаление произошло
             auto old = ids.find(id);
-            timestamp_si.erase(old->second.timestamp);
-            karma_si.erase(old->second.karma);
-            user_si.erase(old->second.user);
+            const SecondIndexIt& iters= old->second;
+            timestamp_si.erase(iters.timestamp);
+            karma_si.erase(iters.karma);
+            user_si.erase(iters.user);
             ids.erase(old);
         }
         return result;
