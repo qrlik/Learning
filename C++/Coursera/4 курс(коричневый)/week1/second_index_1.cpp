@@ -17,29 +17,26 @@ struct Record
     int karma;
 };
 
-struct SecondIndexIt
-{ // структура для хранения указателя и итераторов, для быстрой работы функций
+struct IdData
+{ // структура для хранения данных и итераторов, для быстрой работы функций
+    Record record;
     multimap<int, const Record*>::iterator timestamp;
     multimap<int, const Record*>::iterator karma;
     list<const Record*>::iterator user;
 };
 
-struct IdData
-{
-    Record record;
-    SecondIndexIt iters;
-};
-
 // Реализуйте этот класс
 class Database
 {
-    unordered_map<string, IdData> data;             // id - Records
-    multimap<int, const Record*> timestamp_si;      // вторичный индекс для timestamp
-    multimap<int, const Record*> karma_si;          // вторичный индекс для karma
-    unordered_map<string, list<const Record*>> user_si;   // вторичный индекс для user_si
+    unordered_map<string, IdData> data;                 // id - Records
+    multimap<int, const Record*> timestamp_si;          // вторичный индекс для timestamp
+    multimap<int, const Record*> karma_si;              // вторичный индекс для karma
+    unordered_map<string, list<const Record*>> user_si; // вторичный индекс для user_si
     template<typename T, typename Callback> void RangeBy(const multimap<int, const Record*>& cont, const T& begin, const T& end, Callback callback) const
     { // итерация по [begin,end] пока Callback возвращает true
-        for (auto start = cont.lower_bound(begin); start != cont.upper_bound(end); ++start)
+        auto r_begin = cont.lower_bound(begin);
+        auto r_end = cont.upper_bound(end);
+        for (auto start = r_begin; start != r_end; ++start)
         {
             if (!callback(*start->second))
             {
@@ -54,11 +51,11 @@ public:
         auto [it, is_insert] = data.insert({ record.id, {record} }); // пробуем вставить пару
         if (is_insert)
         { // вставка произошла, нужно добавить данные в индексы и обновить в SecondIndexIt
-            const Record* ptr = &it->second.record;
-            auto time_it = timestamp_si.emplace(ptr->timestamp, ptr);
-            auto karma_it = karma_si.emplace(ptr->karma, ptr);
-            user_si[ptr->user].push_front(ptr);
-            it->second.iters = { time_it , karma_it, user_si[ptr->user].begin() };
+            IdData& data = it->second;
+            const Record* ptr = &data.record;
+            data.timestamp = timestamp_si.emplace(ptr->timestamp, ptr);
+            data.karma = karma_si.emplace(ptr->karma, ptr);
+            data.user = user_si[ptr->user].insert(user_si[ptr->user].end(), ptr);
         }
         return is_insert;
     }
@@ -69,20 +66,17 @@ public:
         {
             return &it->second.record;
         }
-        else
-        {
-            return nullptr;
-        }
+        return nullptr;
     }
 
     bool Erase(const string& id) // Операция Erase должна возвращать true, если удалось удалить элемент с заданным id, и false, если элемент с заданным id не был найден.
     { // В последнем случае состояние базы данных не должно меняться
         if (auto search = data.find(id); search != data.end())
         {
-            const SecondIndexIt& iters = search->second.iters;
-            timestamp_si.erase(iters.timestamp);
-            karma_si.erase(iters.karma);
-            user_si[search->second.record.user].erase(iters.user);
+            const IdData& id_data = search->second;
+            timestamp_si.erase(id_data.timestamp);
+            karma_si.erase(id_data.karma);
+            user_si[search->second.record.user].erase(id_data.user);
             data.erase(search);
             return true;
         }
