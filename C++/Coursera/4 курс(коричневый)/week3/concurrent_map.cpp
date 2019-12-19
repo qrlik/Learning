@@ -14,12 +14,11 @@ template <typename K, typename V, typename Hash = std::hash<K>> class Concurrent
 {
 public:
 	using MapType = unordered_map<K, V, Hash>;
-
 private:
 	struct Page
 	{ // у каждой страницы свой mutex и словарь
-		MapType page_map;
 		mutable mutex page_mutex;
+		MapType page_map;
 	};
 	vector<Page> data;
 	Hash hasher; // хэшер для ключей
@@ -27,28 +26,22 @@ private:
 	{
 		return hasher(key) % data.size();
 	}
-
 public:
-	struct WriteAccess : lock_guard<mutex>
+	template <typename U> struct Access : lock_guard<mutex>
 	{
-		V& ref_to_value;
-		WriteAccess(const K& key, Page& page) : lock_guard(page.page_mutex), ref_to_value(page.page_map[key]) {}
-	};
-
-	struct ReadAccess : lock_guard<mutex>
-	{
-		const V& ref_to_value;
-		ReadAccess(const K& key, const Page& page) : lock_guard(page.page_mutex), ref_to_value(page.page_map.at(key)) {}
+		U& ref_to_value;
+		Access(const K& key, Page& page) : lock_guard(page.page_mutex), ref_to_value(page.page_map[key]) {}
+		Access(const K& key, const Page& page) : lock_guard(page.page_mutex), ref_to_value(page.page_map.at(key)) {}
 	};
 
 	explicit ConcurrentMap(size_t bucket_count) : data(bucket_count) {} // создаем bucket_count страниц со своим mutex и подсловарем
 
-	WriteAccess operator[](const K& key)
+	Access<V> operator[](const K& key)
 	{ // получаем номер страницы - от 0 до pages - 1 и ссылку на страницу.
 		return { key, data[getIndex(key)] };
 	}
 
-	ReadAccess At(const K& key) const
+	Access<const V> At(const K& key) const
 	{
 		return { key, data[getIndex(key)] };
 	}
@@ -57,16 +50,16 @@ public:
 	{
 		const Page& search_page = data[getIndex(key)];
 		lock_guard<mutex> page_guard(search_page.page_mutex);
-		return search_page.page_map.count(key) == 1;
+		return data[getIndex(key)].page_map.count(key) == 1;
 	}
 
 	MapType BuildOrdinaryMap() const
 	{ // вернуть сложенный из страниц словарь
 		MapType result;
-		for (auto& [data, mtx] : data)
+		for (auto& page : data)
 		{
-			lock_guard<mutex> page_guard(mtx); // безопасно получаем доступ к каждой странице
-			result.insert(data.begin(), data.end()); // считываем страницу
+			lock_guard<mutex> page_guard(page.page_mutex); // безопасно получаем доступ к каждой странице
+			result.insert(page.page_map.begin(), page.page_map.end()); // считываем страницу
 		}
 		return result;
 	}
