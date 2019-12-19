@@ -14,24 +14,19 @@ using namespace std;
 template <typename T> class Synchronized
 {
 	T value;
-	mutable mutex ref_mutex;
+	mutex ref_mutex;
 public:
-	template <typename U> struct Access
+	struct Access
 	{
 		lock_guard<mutex> guard;
-		U& ref_to_value;
+		T& ref_to_value;
 	};
 	explicit Synchronized(T initial = T()) : value(move(initial)) {}
 
-	Access<T> GetAccess()
+	Access GetAccess()
 	{
-		return { lock_guard(ref_mutex), value }; // конструируем lock_guard, и в зависимости от ref_mutex поток будет ожидать доступа, 
+		return { lock_guard(ref_mutex), value}; // конструируем lock_guard, и в зависимости от ref_mutex поток будет ожидать доступа, 
 	} // либо начнет работу
-
-	Access<const T> GetAccess() const
-	{
-		return { lock_guard(ref_mutex), value };
-	}
 };
 
 void TestConcurrentUpdate() {
