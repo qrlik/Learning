@@ -4,47 +4,69 @@
 #include <algorithm>
 #include <numeric>
 #include <vector>
+#include <unordered_map>
 #include <string>
 #include <future>
 #include <random>
 using namespace std;
 
-template <typename K, typename V> class ConcurrentMap
+template <typename K, typename V, typename Hash = std::hash<K>> class ConcurrentMap
 {
+public:
+	using MapType = unordered_map<K, V, Hash>;
+
+private:
 	struct Page
 	{ // у каждой страницы свой mutex и словарь
-		mutex page_mutex;
-		map<K, V> page_map;
+		MapType page_map;
+		mutable mutex page_mutex;
 	};
-	size_t pages; // количество страниц (можно опустить)
 	vector<Page> data;
-public:
-	static_assert(is_integral_v<K>, "ConcurrentMap supports only integer keys"); // проверка что ключ является integer
-
-	struct Access
+	Hash hasher; // хэшер для ключей
+	size_t getIndex(const K& key) const
 	{
-		lock_guard<mutex> ref_guard;
-		V& ref_to_value;
-		Access(const K& key, Page& page) : ref_guard(page.page_mutex), ref_to_value(page.page_map[key]) {} // конструктур из решения от менторов
-	};
-
-
-	explicit ConcurrentMap(size_t bucket_count) : pages(bucket_count), data(bucket_count) {} // создаем bucket_count страниц со своим mutex и map
-
-	Access operator[](const K& key)
-	{ // key будет приведен к unsigned int, но на результат % это не повлияет (зато не нужно вызывать abs())
-		Page& page = data[key % pages]; // получаем номер страницы - от 0 до pages - 1 и ссылку на страницу.
-		//return { lock_guard(page.page_mutex), page.page_map[key] }; // сначало создаем lock_guard и блокируем доступ к странице, если нужно
-		return { key, page }; // с таким конструктором работает быстрее (из решения)
+		return hasher(key) % data.size();
 	}
 
-	map<K, V> BuildOrdinaryMap()
+public:
+	struct WriteAccess : lock_guard<mutex>
+	{
+		V& ref_to_value;
+		WriteAccess(const K& key, Page& page) : lock_guard(page.page_mutex), ref_to_value(page.page_map[key]) {}
+	};
+
+	struct ReadAccess : lock_guard<mutex>
+	{
+		const V& ref_to_value;
+		ReadAccess(const K& key, const Page& page) : lock_guard(page.page_mutex), ref_to_value(page.page_map.at(key)) {}
+	};
+
+	explicit ConcurrentMap(size_t bucket_count) : data(bucket_count) {} // создаем bucket_count страниц со своим mutex и подсловарем
+
+	WriteAccess operator[](const K& key)
+	{ // получаем номер страницы - от 0 до pages - 1 и ссылку на страницу.
+		return { key, data[getIndex(key)] };
+	}
+
+	ReadAccess At(const K& key) const
+	{
+		return { key, data[getIndex(key)] };
+	}
+
+	bool Has(const K& key) const
+	{
+		const Page& search_page = data[getIndex(key)];
+		lock_guard<mutex> page_guard(search_page.page_mutex);
+		return search_page.page_map.count(key) == 1;
+	}
+
+	MapType BuildOrdinaryMap() const
 	{ // вернуть сложенный из страниц словарь
-		map<K, V> result;
-		for (auto& page : data)
+		MapType result;
+		for (auto& [data, mtx] : data)
 		{
-			lock_guard<mutex> page_guard(page.page_mutex); // безопасно получаем доступ к каждой странице
-			result.insert(page.page_map.begin(), page.page_map.end()); // считываем страницу
+			lock_guard<mutex> page_guard(mtx); // безопасно получаем доступ к каждой странице
+			result.insert(data.begin(), data.end()); // считываем страницу
 		}
 		return result;
 	}
