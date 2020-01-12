@@ -19,6 +19,7 @@ class Date
     int8_t month_;
     int8_t day_;
 public:
+    Date() = default;
     Date(int y, int m, int d) : year_(y), month_(m), day_(d) {}
 
     time_t AsTimestamp() const
@@ -33,13 +34,12 @@ public:
         t.tm_isdst = 0;
         return mktime(&t);
     }
-};
 
-int ComputeDaysDiff(const Date& date_to, const Date& date_from) {
-  const time_t timestamp_to = date_to.AsTimestamp();
-  const time_t timestamp_from = date_from.AsTimestamp();
-  return (timestamp_to - timestamp_from) / SECONDS_IN_DAY;
-}
+    int64_t operator-(const Date& other) const
+    {
+        return (AsTimestamp() - other.AsTimestamp()) / SECONDS_IN_DAY;
+    }
+};
 
 class Budget
 {
@@ -49,7 +49,16 @@ class Budget
 
     int getIndex(const Date& date) const
     { // date должна быть больше 2000-01-01 по условию задачи
-        return ComputeDaysDiff(date,start);
+        int64_t result = date - start;
+        if (result < 0)
+        {
+            throw invalid_argument("Wrong date in getIndex() -> date < 2000-01-01");
+        }
+        else if (result >= static_cast<int64_t>(data_.size()))
+        {
+            throw invalid_argument("Wrong date in getIndex() -> date > 2100-01-01");
+        }
+        return static_cast<int>(result);
     }
 public:
     Budget() : data_(DAYS_IN_99Y) {}
@@ -57,7 +66,7 @@ public:
     void Earn(const Date& from, const Date& to, int value)
     {
         int first = getIndex(from);
-        int last = getIndex(to);
+        const int last = getIndex(to); 
         double day_income = static_cast<double>(value) / (last - first + 1); // диапазон [from, to]
 
         for (; first <= last; ++first)
@@ -68,19 +77,21 @@ public:
 
     void PayTax(const Date& from, const Date& to)
     {
-        for (int i = getIndex(from); i <= getIndex(to); ++i)
+        const int last = getIndex(to);
+        for (int first = getIndex(from); first <= last; ++first)
         {
-            data_[i] *= tax;
+            data_[first] *= tax;
         }
     }
 
     double ComputeIncome(const Date& from, const Date& to) const
     {
         double result = 0;
+        const int last = getIndex(to);
 
-        for (int i = getIndex(from); i <= getIndex(to); ++i)
+        for (int first = getIndex(from); first <= last; ++first)
         {
-            result += data_[i];
+            result += data_[first];
         }
 
         return result;
@@ -90,37 +101,17 @@ public:
 const Date Budget::start = { 2000, 1, 1 };
 const double Budget::tax = 0.87;
 
-Date ParseDate(string_view str)
+istream& operator>>(istream& is, Date& date)
 { // Все даты вводятся в формате YYYY-MM-DD. Даты корректны
-    int16_t year = stoi(string(str.substr(0, 4)));
-    str.remove_prefix(5);
-    int8_t month = stoi(string(str.substr(0, 2)));
-    str.remove_prefix(3);
-    int8_t day = stoi(string(str.substr(0, 2)));;
-    return Date{ year, month, day };
-}
-
-vector<string_view> SplitIntoWords(string_view str)
-{
-    vector<string_view> result;
-
-    while (true) {
-        size_t not_space = str.find_first_not_of(' '); // лишние пробелы перед словом
-        str.remove_prefix(not_space);
-
-        size_t space = str.find(' ');
-        result.push_back(str.substr(0, space));
-        if (space == str.npos)
-        {
-            break;
-        }
-        else
-        {
-            str.remove_prefix(space + 1);
-        }
-    }
-
-    return result;
+    int year;
+    int month, day;
+    is >> year;
+    is.ignore(1);
+    is >> month;
+    is.ignore(1);
+    is >> day;
+    date = Date(year, month, day);
+    return is;
 }
 
 struct Request
@@ -128,25 +119,17 @@ struct Request
     string command;
     Date from;
     Date to;
-    int value = -1; //положительные целые числа, не превышающие 10^6
+    int value;
 };
 
-Request ProcessRequest(string_view request)
+Request ProcessRequest(const string& request)
 {
-    vector<string_view> words = SplitIntoWords(request);
-    if (words.size() >= 3 && words.size() < 5)
-    {
-        Request result{ string(words[0]), ParseDate(words[1]), ParseDate(words[2]) };
-        if (words.size() == 4)
-        {
-            result.value = stoi(string(words[3]));
-        }
-        return result;
-    }
-    else
-    {
-        throw invalid_argument("Wrong size of request in ProcessRequest()");
-    }
+    istringstream is(request);
+    string command;
+    Date from, to;
+    int value = -1;
+    is >> command >> from >> to >> value;
+    return Request{move(command), from, to, value};
 }
 
 void PrintRequest(Request request, Budget& budget, ostream& os = cout)
