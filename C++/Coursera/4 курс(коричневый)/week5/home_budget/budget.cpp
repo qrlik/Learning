@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <ctime>
 
+#include "test_runner.h"
+
 using namespace std;
 
 const static int SECONDS_IN_DAY = 60 * 60 * 24;
@@ -32,9 +34,9 @@ public:
         return mktime(&t);
     }
 
-    int operator-(const Date& other) const
+    int64_t operator-(const Date& other) const
     {
-        return static_cast<int>(AsTimestamp() - other.AsTimestamp()) / SECONDS_IN_DAY;
+        return (AsTimestamp() - other.AsTimestamp()) / SECONDS_IN_DAY;
     }
 };
 
@@ -44,23 +46,27 @@ class Budget
     const static Date start;
     const static double tax;
 
-    size_t getIndex(const Date& date) const
+    int getIndex(const Date& date) const
     { // date должна быть больше 2000-01-01 по условию задачи
-        size_t result = static_cast<size_t>(date - start);
-        if (result >= DAYS_IN_99Y)
+        int64_t result = date - start;
+        if (result < 0)
         {
-            throw invalid_argument("Wrong date in getIndex()");
+            throw invalid_argument("Wrong date in getIndex() -> date < 2000-01-01");
         }
-        return result;
+        else if (result >= static_cast<int64_t>(data_.size()))
+        {
+            throw invalid_argument("Wrong date in getIndex() -> date > 2100-01-01");
+        }
+        return static_cast<int>(result);
     }
 public:
     Budget() : data_(DAYS_IN_99Y) {}
 
     void Earn(const Date& from, const Date& to, int value)
     {
-        size_t first = getIndex(from);
-        size_t last = getIndex(to);
-        double day_income = static_cast<double>(value) / (last - first + 1);
+        int first = getIndex(from);
+        const int last = getIndex(to); 
+        double day_income = static_cast<double>(value) / (last - first + 1); // диапазон [from, to]
 
         for (; first <= last; ++first)
         {
@@ -70,26 +76,21 @@ public:
 
     void PayTax(const Date& from, const Date& to)
     {
-        for (size_t i = getIndex(from); i <= getIndex(to); ++i)
+        const int last = getIndex(to);
+        for (int first = getIndex(from); first <= last; ++first)
         {
-            data_[i] *= tax;
+            data_[first] *= tax;
         }
     }
 
     double ComputeIncome(const Date& from, const Date& to) const
     {
         double result = 0;
+        const int last = getIndex(to);
 
-        try
+        for (int first = getIndex(from); first <= last; ++first)
         {
-            for (size_t i = getIndex(from); i <= getIndex(to); ++i)
-            {
-                result += data_[i];
-            }
-        }
-        catch (const invalid_argument&)
-        {
-
+            result += data_[first];
         }
 
         return result;
@@ -162,7 +163,7 @@ void PrintRequest(Request request, Budget& budget, ostream& os = cout)
 {
     if (request.command == "ComputeIncome")
     {
-        cout << budget.ComputeIncome(request.from, request.to) << '\n';
+        os << budget.ComputeIncome(request.from, request.to) << '\n';
     }
     else if (request.command == "Earn")
     {
@@ -198,9 +199,40 @@ vector<string> ParseRequests(istream& is = cin)
     return requests;
 }
 
+void TaskTest()
+{
+    istringstream input("8\n"
+        "Earn 2000-01-02 2000-01-06 20\n"
+        "ComputeIncome 2000-01-01 2001-01-01\n"
+        "PayTax 2000-01-02 2000-01-03\n"
+        "ComputeIncome 2000-01-01 2001-01-01\n"
+        "Earn 2000-01-03 2000-01-03 10\n"
+        "ComputeIncome 2000-01-01 2001-01-01\n"
+        "PayTax 2000-01-03 2000-01-03\n"
+        "ComputeIncome 2000-01-01 2001-01-01\n"
+    );
+
+    vector<string> requests = ParseRequests(input);
+    ostringstream output;
+    Budget b;
+    for (const string& request : requests)
+    {
+        PrintRequest(ProcessRequest(request), b, output);
+    }
+    ASSERT_EQUAL(output.str(), "20\n"
+        "18.96\n"
+        "28.96\n"
+        "27.2076\n");
+}
+
+void TestAll()
+{
+    TestRunner tr;
+    RUN_TEST(tr, TaskTest);
+}
+
 int main() {
-    cin.tie(nullptr);
-    ios_base::sync_with_stdio(false);
+    TestAll();
 
     vector<string> requests = ParseRequests();
     Budget home_budget;
@@ -213,13 +245,13 @@ int main() {
             PrintRequest(ProcessRequest(request), home_budget);
         }
     }
-    catch (const invalid_argument&)
+    catch (const invalid_argument & ex)
     {
-        cout << ex.what() << endl;
+        cerr << ex.what() << endl;
     }
     catch (...)
     {
-        cout << "Unexpect exception" << endl;
+        cerr << "Unexpect exception" << endl;
     }
 
     return 0;
