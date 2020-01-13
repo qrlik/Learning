@@ -10,6 +10,32 @@ using namespace std;
 Сигнатура: void TrimRight( char *s );
 */
 
+void TrimRight(char* s) {
+	if (!s) {
+		return;
+	}
+
+	size_t len = strlen(s);
+
+	int mask = *reinterpret_cast<int*>(string(4, ' ').data());
+
+	int* new_ptr = reinterpret_cast<int*>(s + len % 4);
+
+	for (size_t i = len / 4; i > 0; --i, len -= 4) {
+		if (new_ptr[i - 1] != mask) {
+			break;
+		}
+	}
+
+	for (; len > 0; --len) {
+		if (s[len - 1] != ' ') {
+			break;
+		}
+	}
+
+	s[len] = '\0';
+}
+
 void TrimRightStrlen(char* s) {
 	if (!s) {
 		return;
@@ -73,48 +99,52 @@ void TrimRightWhile(char* s) {
 	}
 }
 
-void TestTrimRightStrlen()
+template<typename Func>
+void TestTrimTemplate(Func f)
 {
 	string test = "a b c   ";
-	string test2 = "      ";
-	TrimRightStrlen(test.data());
-	TrimRightStrlen(test2.data());
+	string test2 = "                  a";
+	string test3 = "a                  ";
+	string test4 = "                  ";
+	f(test.data());
+	f(test2.data());
+	f(test3.data());
+	f(test4.data());
 
 	string test_check = "a b c";
-	string test2_check = "";
+	string test2_check = "                  a";
+	string test3_check = "a";
+	string test4_check = "";
 	ASSERT_EQUAL(test.data(), test_check);
 	ASSERT_EQUAL(test2.data(), test2_check);
+	ASSERT_EQUAL(test3.data(), test3_check);
+	ASSERT_EQUAL(test4.data(), test4_check);
+}
+
+void TestTrimRight()
+{
+	TestTrimTemplate(TrimRight);
+}
+
+void TestTrimRightStrlen()
+{
+	TestTrimTemplate(TrimRightStrlen);
 }
 
 void TestTrimRightFor()
 {
-	string test = "a b c   ";
-	string test2 = "      ";
-	TrimRightFor(test.data());
-	TrimRightFor(test2.data());
-
-	string test_check = "a b c";
-	string test2_check = "";
-	ASSERT_EQUAL(test.data(), test_check);
-	ASSERT_EQUAL(test2.data(), test2_check);
+	TestTrimTemplate(TrimRightFor);
 }
 
 void TestTrimRightWhile()
 {
-	string test = "a b c   ";
-	string test2 = "      ";
-	TrimRightWhile(test.data());
-	TrimRightWhile(test2.data());
-
-	string test_check = "a b c";
-	string test2_check = "";
-	ASSERT_EQUAL(test.data(), test_check);
-	ASSERT_EQUAL(test2.data(), test2_check);
+	TestTrimTemplate(TrimRightWhile);
 }
 
 void TestAll()
 {
 	TestRunner tr;
+	RUN_TEST(tr, TestTrimRight);
 	RUN_TEST(tr, TestTrimRightStrlen);
 	RUN_TEST(tr, TestTrimRightFor);
 	RUN_TEST(tr, TestTrimRightWhile);
@@ -125,24 +155,31 @@ int main()
 	TestAll();
 
 	{
+		LOG_DURATION("Pointer");
+		string test(1'000'000'000, ' ');
+		TrimRight(test.data());
+		cout << "Pointer result is '" << test.data() << "'" << endl;
+	}
+
+	{
 		LOG_DURATION("Strlen");
-		string test(10'000'000'000, ' ');
+		string test(1'000'000'000, ' ');
 		TrimRightStrlen(test.data());
 		cout << "Strlen result is '" << test.data() << "'" << endl;
 	}
 
 	{
 		LOG_DURATION("For");
-		string test(10'000'000'000, ' ');
+		string test(1'000'000'000, ' ');
 		TrimRightFor(test.data());
-		cout << "Pointer result is '" << test.data() << "'" << endl;
+		cout << "For result is '" << test.data() << "'" << endl;
 	}
 
 	{
 		LOG_DURATION("While");
-		string test(10'000'000'000, ' ');
+		string test(1'000'000'000, ' ');
 		TrimRightWhile(test.data());
-		cout << "Pointer result is '" << test.data() << "'" << endl;
+		cout << "While result is '" << test.data() << "'" << endl;
 	}
 	return 0;
 }
