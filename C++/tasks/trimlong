@@ -12,12 +12,12 @@ using namespace std;
 Сигнатура: void TrimRight( char *s );
 */
 
-bool checkZeroByte(const int* ptr)
+bool hasZeroByte(const int* ptr) // проверка на нулевой байт
 {
-	const char* new_ptr = reinterpret_cast<const char*>(ptr);
+	const char* pbyte = reinterpret_cast<const char*>(ptr);
 	for (size_t i = 0; i < sizeof(int); ++i)
 	{
-		if (new_ptr[i] == 0)
+		if (pbyte[i] == 0)
 		{
 			return true;
 		}
@@ -25,17 +25,47 @@ bool checkZeroByte(const int* ptr)
 	return false;
 }
 
-char* find_not_space(int* ptr, char* begin)
-{
-	char* new_ptr = reinterpret_cast<char*>(ptr);
-	for (size_t i = 0; i < sizeof(int) && new_ptr != begin; ++i)
+struct Suffix {
+	char* ptr;
+	bool is_empty; // для случая когда нулевой байт вначале последнего считывания
+};
+
+Suffix FindSpaceSuffix(int* ptr)
+{ // поиск суффикса из пробелов
+	char* pbyte = reinterpret_cast<char*>(ptr);
+	char* pos = nullptr;
+
+	size_t i = 0;
+	for (; i < sizeof(int) && *pbyte != 0; ++pbyte, ++i)
 	{
-		if (*(--new_ptr) != ' ')
-		{
-			break;
+		if (*pbyte == ' ') {
+			if (!pos) {
+				pos = pbyte;
+			}
+		}
+		else {
+			pos = nullptr;
 		}
 	}
-	return new_ptr;
+
+	if (i == 0) {
+		return { pos, true };
+	}
+	return { pos, false };
+}
+
+Suffix ComputeLeftSuffix(int* begin, int* space_suffix, int* ptr)
+{
+	Suffix left_suffix = { nullptr, true };
+	if (space_suffix) {
+		left_suffix = (space_suffix != begin)
+			? FindSpaceSuffix(space_suffix - 1)
+			: Suffix{ reinterpret_cast<char*>(begin), false };
+	}
+	else if (ptr != begin) {
+		left_suffix = FindSpaceSuffix(ptr - 1);
+	}
+	return left_suffix;
 }
 
 void TrimRight(char* s) {
@@ -44,208 +74,34 @@ void TrimRight(char* s) {
 	}
 
 	int mask = *reinterpret_cast<int*>(string(4, ' ').data()); // маска из пробелов
-
 	int* ptr = reinterpret_cast<int*>(s);
-	int* space = nullptr;
+	int* begin = ptr;
+	int* space_suffix = nullptr;
 
-	bool break_point = false;
 	for (; ; ++ptr) {
 		if (*ptr == mask) {
-			if (!space) {
-				space = ptr;
+			if (!space_suffix) {
+				space_suffix = ptr;
 			}
 		}
 		else {
-			break_point = checkZeroByte(ptr);
-			if (!break_point) {
-				space = nullptr;
+			if (!hasZeroByte(ptr)) { 
+				space_suffix = nullptr;
 			}
 			else {
 				break;
 			}
 		}
 	}
+	// условно делим данные на часть слева от ptr и справа (хвостик с нулевым байтом)
+	Suffix left_suffix = ComputeLeftSuffix(begin, space_suffix, ptr);
+	Suffix right_suffix = FindSpaceSuffix(ptr);
 
-	int* where_we_are = (space) ? space : ptr;
-	char* last_pos = find_not_space(where_we_are, s);
-
-	s = reinterpret_cast<char*>(ptr);
-	char* last_space = nullptr;
-	for (; *s != '\0'; ++s)
-	{
-		if (*s == ' ') {
-			if (!last_space) {
-				last_space = s;
-			}
-		}
-		else {
-			last_space = nullptr;
-		}
+	if (left_suffix.ptr && (right_suffix.ptr == reinterpret_cast<char*>(ptr) || right_suffix.is_empty == true))
+	{ // если есть суффикс слева и справа либо нулевой байт либо все пробелы обнуляем левый
+		*left_suffix.ptr = 0;
 	}
-
-	if (last_space && last_space == reinterpret_cast<char*>(ptr))
-	{
-		if (*last_pos == ' ') {
-			*last_pos = 0;
-		}
-		else {
-			last_pos[1] = 0;
-		}
+	else if (right_suffix.ptr) {
+		*right_suffix.ptr = 0;
 	}
-	else if (last_space)
-	{
-		*last_space = 0;
-	}
-	else if (s == reinterpret_cast<char*>(ptr))
-	{
-		last_pos[1] = 0;
-	}
-}
-
-void TrimRightStrlen(char* s) {
-	if (!s) {
-		return;
-	}
-
-	size_t len = strlen(s);
-	for (; len > 0; --len) {
-		if (s[len - 1] != ' ') {
-			break;
-		}
-	}
-	s[len] = '\0';
-}
-
-void TrimRightFor(char* s) {
-	if (!s) {
-		return;
-	}
-
-	char* last_space = nullptr;
-	for (; *s != '\0'; ++s)
-	{
-		if (*s == ' ') {
-			if (!last_space) {
-				last_space = s;
-			}
-		}
-		else {
-			last_space = nullptr;
-		}
-	}
-
-	if (last_space) {
-		*last_space = '\0';
-	}
-}
-
-void TrimRightWhile(char* s) {
-	if (!s) {
-		return;
-	}
-
-	char* last_space = nullptr;
-	char symbol = *s;
-
-	while (symbol != '\0') {
-		if (*s == ' ') {
-			if (!last_space) {
-				last_space = s;
-			}
-		}
-		else if (symbol != ' ') {
-			last_space = nullptr;
-		}
-		++s;
-		symbol = *s;
-	}
-
-	if (last_space) {
-		*last_space = '\0';
-	}
-}
-
-template<typename Func>
-void TestTrimTemplate(Func f)
-{
-	string test = "a b c   ";
-	string test2 = "                  a";
-	string test3 = "a                  ";
-	string test4 = "                  ";
-	f(test.data());
-	f(test2.data());
-	f(test3.data());
-	f(test4.data());
-
-	string test_check = "a b c";
-	string test2_check = "                  a";
-	string test3_check = "a";
-	string test4_check = "";
-	ASSERT_EQUAL(test.data(), test_check);
-	ASSERT_EQUAL(test2.data(), test2_check);
-	ASSERT_EQUAL(test3.data(), test3_check);
-	ASSERT_EQUAL(test4.data(), test4_check);
-}
-
-void TestTrimRight()
-{
-	TestTrimTemplate(TrimRight);
-}
-
-void TestTrimRightStrlen()
-{
-	TestTrimTemplate(TrimRightStrlen);
-}
-
-void TestTrimRightFor()
-{
-	TestTrimTemplate(TrimRightFor);
-}
-
-void TestTrimRightWhile()
-{
-	TestTrimTemplate(TrimRightWhile);
-}
-
-void TestAll()
-{
-	TestRunner tr;
-	RUN_TEST(tr, TestTrimRight);
-	RUN_TEST(tr, TestTrimRightStrlen);
-	RUN_TEST(tr, TestTrimRightFor);
-	RUN_TEST(tr, TestTrimRightWhile);
-}
-
-int main()
-{
-	TestAll();
-
-	{
-		LOG_DURATION("String_view");
-		string test(1'000'000'000, ' ');
-		TrimRight(test.data());
-		cout << "SV result is '" << test.data() << "'" << endl;
-	}
-
-	{
-		LOG_DURATION("Strlen");
-		string test(1'000'000'000, ' ');
-		TrimRightStrlen(test.data());
-		cout << "Strlen result is '" << test.data() << "'" << endl;
-	}
-
-	{
-		LOG_DURATION("For");
-		string test(1'000'000'000, ' ');
-		TrimRightFor(test.data());
-		cout << "For result is '" << test.data() << "'" << endl;
-	}
-
-	{
-		LOG_DURATION("While");
-		string test(1'000'000'000, ' ');
-		TrimRightWhile(test.data());
-		cout << "While result is '" << test.data() << "'" << endl;
-	}
-	return 0;
 }
