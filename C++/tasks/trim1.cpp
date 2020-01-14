@@ -1,4 +1,5 @@
 #include <string>
+#include <cstring>
 using namespace std;
 
 /*
@@ -7,7 +8,7 @@ using namespace std;
 Сигнатура: void TrimRight( char *s );
 */
 
-// 800мс на строке из 10^9 пробелов
+// ~800мс на строке из 10^9 пробелов
 
 template<typename T, typename Func>
 bool IterationBreak(T* ptr, T*& space_suffix, T mask, Func func) { // шаблонная итерация
