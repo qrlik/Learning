@@ -8,8 +8,6 @@ using namespace std;
 Сигнатура: void TrimRight( char *s );
 */
 
-// ~1500мс на строке из 10^9 пробелов
-
 void TrimRight(char* s) {
 	if (!s) {
 		return;
