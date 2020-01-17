@@ -28,7 +28,7 @@ double ComputeIncomeRequest::Process(const BudgetManager& manager) const{
 void PayTaxRequest::ParseFrom(string_view input) {
 	date_from = Date::FromString(ReadToken(input));
 	date_to = Date::FromString(ReadToken(input));
-	percentage = ConvertToInt(input);
+	percentage = static_cast<uint8_t>(ConvertToInt(input));
 }
 
 void PayTaxRequest::Process(BudgetManager& manager) const{
