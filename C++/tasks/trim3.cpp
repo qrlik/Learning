@@ -15,22 +15,14 @@ void TrimRight(char* s) {
 		return;
 	}
 
-	char* last_space = nullptr;
-	for (; *s != '\0'; ++s)
-	{
-		if (*s == ' ') {
-			if (!last_space) {
-				last_space = s;
-			}
-		}
-		else {
-			last_space = nullptr;
+	char* trim_ptr = s;
+	for (; *s != '\0'; ++s) {
+		if (*s != ' ') {
+			trim_ptr = s + 1;
 		}
 	}
 
-	if (last_space) {
-		*last_space = '\0';
-	}
+	*trim_ptr = '\0';
 }
 
 int main()
