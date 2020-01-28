@@ -35,7 +35,7 @@ void BusManager::AddStop(string name, Stop_info info) {
 	stop_data[move(name)] = info;
 }
 
-void BusManager::AddBus(std::string name, const std::vector<std::string>& stops) {
+void BusManager::AddBus(string name, const vector<string>& stops) {
 	vector<string_view> stops_sv;
 	unordered_set<string_view> uniques;
 	for (const auto& stop : stops) { // создаем sv для bus_data из stop_data
