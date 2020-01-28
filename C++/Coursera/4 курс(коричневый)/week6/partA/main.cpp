@@ -21,10 +21,12 @@ void TestPartA() {
         "Bus 750\n"
         "Bus 751\n"
     );
-    const auto requests = Request::Read(input);
-    const auto responses = Request::Process(requests);
+
+    using namespace Request::Handler;
+    const auto requests = Read(input);
+    const auto responses = Process(requests);
     ostringstream output;
-    Request::Print(responses, output);
+    Print(responses, output);
     ASSERT_EQUAL(output.str(),
         "Bus 256: 6 stops on route, 5 unique stops, 4371.017251 route length\n"
         "Bus 750: 5 stops on route, 3 unique stops, 20939.483047 route length\n"
@@ -40,8 +42,9 @@ void TestAll() {
 int main() {
     TestAll();
 
-    const auto requests = Request::Read();
-    const auto responses = Request::Process(requests);
-    Request::Print(responses);
+    using namespace Request::Handler;
+    const auto requests = Read();
+    const auto responses = Process(requests);
+    Print(responses);
     return 0;
 }
