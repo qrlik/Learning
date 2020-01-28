@@ -11,7 +11,7 @@ namespace {
 	const double PI = 3.1415926535;
 }
 
-double BusManager::StopInfo::Length(const StopInfo& other) const {
+double BusManager::Stop_info::Length(const Stop_info& other) const {
 	// углы в радианах
 	double lat_1 = latitude * PI / 180;
 	double long_1 = longitude * PI / 180;
@@ -31,14 +31,14 @@ double BusManager::CalculateLength(const vector<string_view>& stops) const {
 	return result;
 }
 
-void BusManager::AddStop(string name, StopInfo info) {
+void BusManager::AddStop(string name, Stop_info info) {
 	stop_data[move(name)] = info;
 }
 
 void BusManager::AddBus(std::string name, const std::vector<std::string>& stops) {
 	vector<string_view> stops_sv;
 	unordered_set<string_view> uniques;
-	for (const auto& stop : stops) { // заносим sv в bus_data из stop_data (stops уничтожится)
+	for (const auto& stop : stops) { // создаем sv для bus_data из stop_data
 		if (auto it = stop_data.find(stop); it != stop_data.end()) { // по условию входных данных проверка необязательна
 			stops_sv.push_back(it->first);
 			uniques.insert(it->first);
@@ -48,7 +48,7 @@ void BusManager::AddBus(std::string name, const std::vector<std::string>& stops)
 		}
 	}
 	double length = CalculateLength(stops_sv);
-	bus_data[move(name)] = { move(stops_sv), length, uniques.size() };
+	bus_data[move(name)] = Bus_info{ move(stops_sv), length, uniques.size() };
 }
 
 string BusManager::BusInfo(string name) const {
