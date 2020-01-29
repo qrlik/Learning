@@ -94,12 +94,6 @@ struct Unit {
 	uint16_t amount;
 };
 
-struct UnitHasher {
-	size_t operator()(const Unit& u) const {
-		return static_cast<size_t>(u.system) * 37 + u.amount;
-	}
-};
-
 Unit ConvertToUnit(string_view str) {
 	if (const auto it = STR_TO_SYSTEM.find(str);
 		it != STR_TO_SYSTEM.end()) {
@@ -118,17 +112,16 @@ Unit ConvertToUnit(string_view str) {
 struct Ingredient {
     string _name;
 	Unit _unit;
-    bool operator==(const Ingredient& other) const {
-        return _name == other._name;
-    }
+	bool operator==(const Ingredient& rhs) const {
+		return _name == rhs._name;
+	}
 };
 
 struct IngredientHasher {
 	size_t operator()(const Ingredient& i) const {
-		return shash(i._name) * 37 + uhash(i._unit);
+		return shash(i._name);
 	}
 	hash<string> shash;
-	UnitHasher uhash;
 };
 
 using Ingredients = unordered_map<Ingredient, size_t, IngredientHasher>;
@@ -272,7 +265,8 @@ IngredientCatalog ParseIngredientCatalog(istream& in_stream = cin) {
 using DishComposition = unordered_map<string, Composition>;
 
 /* суммируем все ингредиенты необходимые для блюд */
-pair<Ingredients, DishComposition> SumAllDishes(const vector<Dish>& dishes, const IngredientCatalog& catalog) {
+pair<Ingredients, DishComposition> SumAllDishes(const vector<Dish>& dishes,
+	const IngredientCatalog& catalog, const PriceCatalog& prices) {
 	Ingredients summary; // общее количество ингредиентов
 	DishComposition dishes_composition;
 
@@ -288,6 +282,14 @@ pair<Ingredients, DishComposition> SumAllDishes(const vector<Dish>& dishes, cons
 			dish_composition += ing_data._composition * factor;
 		}
 	}
+	Ingredient tmp{};
+	for (const auto& ingredient : prices) {
+		tmp = { ingredient.first, ingredient.second._unit };
+		if (auto it = summary.find(tmp); it == summary.end()) {
+			summary.insert({ move(tmp), 0 });
+		}
+	}
+
 	return { move(summary), move(dishes_composition) };
 }
 
@@ -360,7 +362,7 @@ void PrintResults(size_t check, const Ingredients& packeges, const DishCompositi
 //	PriceCatalog prices = ParsePriceCatalog(input);
 //	IngredientCatalog catalog = ParseIngredientCatalog(input);
 //
-//	auto [ingredients, composition] = SumAllDishes(dishes, catalog);
+//	auto [ingredients, composition] = SumAllDishes(dishes, catalog, prices);
 //	auto [packages, check] = CalculateValues(ingredients, prices);
 //
 //	ostringstream output;
@@ -391,7 +393,7 @@ int main()
 	PriceCatalog prices = ParsePriceCatalog();
 	IngredientCatalog catalog = ParseIngredientCatalog();
 
-	auto [ingredients, composition] = SumAllDishes(dishes, catalog);
+	auto [ingredients, composition] = SumAllDishes(dishes, catalog, prices);
 	auto [packages, check] = CalculateValues(ingredients, prices);
 
 	PrintResults(check, packages, composition);
