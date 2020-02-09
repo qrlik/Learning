@@ -75,41 +75,71 @@ namespace Request {
 				}
 				return result;
 			}
+
+			auto GetProcessFunc(Format format) {
+				string (IRead<string>::*func)(const BusManager&) const;
+				switch (format)
+				{
+				case Request::Format::JSON:
+					func = &IRead<string>::ProcessJson;
+					break;
+				default:
+					func = &IRead<string>::Process;
+					break;
+				}
+				return func;
+			}
 		}
 
-		std::pair<Splited, Format> Read(istream& in_stream) {
+		pair<Splited, Format> Read(istream& in_stream) {
 			Format format = GetFormat(in_stream.peek());
-			Splited split_requests;
 			switch (format) {
 			case Format::JSON:
-				split_requests = JsonRead(Json::Load(in_stream));
+				return { JsonRead(Json::Load(in_stream)), format };
 			default:
-				split_requests = { PartionRead(Mode::MODIFY, in_stream),
-					PartionRead(Mode::READ, in_stream) };
+				return { Splited{ PartionRead(Mode::MODIFY, in_stream),
+					PartionRead(Mode::READ, in_stream) }, format };
 			}
-			return { move(split_requests) , format };
 		}
 
 		vector<string> Process(const pair<Splited, Format>& input_data) {
 			vector<string> responses;
+			responses.reserve((input_data.second == Format::JSON) ?
+				input_data.first.read.size() + 2 : input_data.first.read.size());
+
 			BusManager manager;
+			auto process_func = GetProcessFunc(input_data.second);
 
 			for (const auto& request_holder : input_data.first.modify) {
 				const auto& request = static_cast<const IModify&>(*request_holder);
 				request.Process(manager);
 			}
 
+			if (input_data.second == Format::JSON) {
+				responses.push_back("[");
+			}
 			for (const auto& request_holder : input_data.first.read) {
 				const auto& request = static_cast<const IRead<string>&>(*request_holder);
-				responses.push_back(request.Process(manager));
+				responses.push_back((request.*process_func)(manager));
+			}
+			if (input_data.second == Format::JSON) {
+				responses.back().pop_back();
+				responses.push_back("]");
 			}
 
 			return responses;
 		}
 
 		void Print(const vector<string>& responses, ostream& os_stream) {
+			bool first = true;
 			for (const auto& response : responses) {
-				os_stream << response << '\n';
+				if (!first) {
+					os_stream << '\n';
+				}
+				else {
+					first = false;
+				}
+				os_stream << response;
 			}
 		}
 	}
@@ -265,12 +295,12 @@ namespace Request {
 	string StopInfo::ProcessJson(const BusManager& manager) const {
 		auto stop_info = manager.StopInfo(stop_name);
 		ostringstream result;
-		result << "{\n" << " \"request_id\": " << id << ",\n";
+		result << "{\n" << "\"request_id\": " << id << ",\n";
 		if (!stop_info) {
-			result << " \"error_message\": \"not found\"";
+			result << "\"error_message\": \"not found\"";
 		}
 		else {
-			result << " \"buses\": [";
+			result << "\"buses\": [";
 			bool first = true;
 			for (string_view bus : stop_info->buses) {
 				if (!first) {
@@ -286,7 +316,7 @@ namespace Request {
 			}
 			result << "]";
 		}
-		result << "\n}";
+		result << "\n},";
 		return result.str();
 	}
 
@@ -322,8 +352,21 @@ namespace Request {
 	}
 
 	string BusInfo::ProcessJson(const BusManager& manager) const {
-		auto stop_info = manager.BusInfo(bus_name);
+		auto bus_info = manager.BusInfo(bus_name);
 		ostringstream result;
-		result << "{\n" << " \"request_id\": " << id << ",\n";
+		result.setf(ios::fixed);
+		result.precision(6);
+		result << "{\n" << "\"request_id\": " << id << ",\n";
+		if (!bus_info) {
+			result << "\"error_message\": \"not found\"";
+		}
+		else {
+			result << "\"route_length\": " << bus_info->length.road_length << ",\n" <<
+				"\"curvature\": " << bus_info->length.curvature << ",\n" <<
+				"\"stop_count\": " << bus_info->stops.size() << ",\n" <<
+				"\"unique_stop_count\": " << bus_info->unique_stops;
+		}
+		result << "\n},";
+		return result.str();
 	}
 }
