@@ -29,17 +29,23 @@ namespace Json {
 
     namespace {
         void GetDigits(string& str, istream& input) {
-            while (isdigit(input.peek())) {
-                str.push_back(static_cast<char>(input.get()));
+            char c = static_cast<char>(input.get());
+            for (; isdigit(c); c = static_cast<char>(input.get())) {
+                str.push_back(c);
             }
+            input.putback(c);
         }
     }
 
     Node LoadDouble(istream& input) {
         string str_double;
+        if (input.peek() == '-') {
+            str_double.push_back(static_cast<char>(input.get()));
+        }
 
         GetDigits(str_double, input);
         if (input.peek() == '.') {
+            str_double.push_back(static_cast<char>(input.get()));
             GetDigits(str_double, input);
         }
 
@@ -78,11 +84,9 @@ namespace Json {
     }
 
     Node LoadBool(istream& input) {
-        if (input.get() == 't' && input.get() == 'r' &&
-            input.get() == 'u' && input.get() == 'e') {
-            return Node(true);
-        }
-        return Node(false);
+        bool result = (input.get() == 't') ? true : false;
+        input.ignore((result) ? 3 : 4);
+        return result;
     }
 
     Node LoadNode(istream& input) {
@@ -98,11 +102,12 @@ namespace Json {
         else if (c == '"') {
             return LoadString(input);
         }
-        else if (isdigit(c)) {
+        else if (isdigit(c) || c == '-') {
             input.putback(c);
             return LoadDouble(input);
         }
         else {
+            input.putback(c);
             return LoadBool(input);
         }
     }
