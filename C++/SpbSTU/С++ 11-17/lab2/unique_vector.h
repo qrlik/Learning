@@ -23,12 +23,11 @@ class UniqueVector {
 	template<typename Cont>
 	std::vector<T> ComputeUniques(Cont&& cont) {
 		std::vector<T> uniques;
-		bool is_rvalue = std::is_rvalue_reference_v<Cont&&>; 
 
 		for (auto& element : cont) {
 			if ((!_bounds || _bounds.value().in_range(element)) &&
 				std::find(uniques.begin(), uniques.end(), element) == uniques.end()) {
-				if (is_rvalue) {
+				if constexpr (std::is_rvalue_reference_v<Cont&&>) {
 					uniques.emplace_back(std::move(element));
 				}
 				else {
