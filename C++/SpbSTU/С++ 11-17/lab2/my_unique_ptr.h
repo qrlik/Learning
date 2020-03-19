@@ -28,10 +28,14 @@ public:
 		std::swap(ptr, other.ptr);
 	}
 
-	T* get() const noexcept {
+	T* get() noexcept {
 		return ptr;
 	}
-
+	
+	T* const get() const noexcept {
+		return ptr;
+	}
+	
 	void set(T value) {
 		if (!ptr) {
 			ptr = new T(std::move(value));
@@ -45,10 +49,14 @@ public:
 		return *ptr;
 	}
 
-	T* operator->() const noexcept {
+	T* operator->() noexcept {
 		return ptr;
 	}
-
+	
+	T* const operator->() const noexcept {
+		return ptr;
+	}
+	
 	explicit operator bool() const noexcept {
 		return ptr != nullptr;
 	}
