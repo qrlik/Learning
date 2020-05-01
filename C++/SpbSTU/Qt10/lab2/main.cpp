@@ -4,11 +4,6 @@
 #include "salary.h"
 
 #include <QApplication>
-#include <QTranslator>
-#include <QLibraryInfo>
-#include <QColorDialog>
-#include <QFileDialog>
-#include <QBitmap>
 
 int main(int argc, char *argv[])
 {
