@@ -28,7 +28,7 @@ public:
 	}
 	threadsafe_stack& operator=(threadsafe_stack&& other) {
 		if (this != &other) {
-			std::scoped_lock(_mutex, other._mutex);
+			std::scoped_lock sl(_mutex, other._mutex);
 			_data = std::move(other._data);
 		}
 		return *this;
@@ -66,7 +66,7 @@ public:
 	}
 
 	void swap(threadsafe_stack& other) {
-		std::scoped_lock(_mutex, other._mutex);
+		std::scoped_lock sl(_mutex, other._mutex);
 		std::swap(_data, other._data);
 	}
 };
