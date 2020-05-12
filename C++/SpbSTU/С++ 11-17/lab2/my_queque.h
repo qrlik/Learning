@@ -155,11 +155,11 @@ public:
 	}
 
 	T& front() {
-		return *_ar;
+		return this->operator[](0);
 	}
 
 	const T& front() const {
-		return *_ar;
+		return this->operator[](0);
 	}
 
 	T& back() {
