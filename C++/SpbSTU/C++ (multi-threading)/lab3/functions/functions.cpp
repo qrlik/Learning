@@ -95,7 +95,7 @@ namespace {
 		vector<future<void>> futures;
 		futures.reserve(16);
 		{
-			LOG_DURATION("A_mutex");
+			LOG_DURATION("A_test");
 			for (size_t i = 0; i < 16; ++i) {
 				futures.push_back(async(launch::async, []() {
 					for (size_t i = 0; i < 100'000; ++i) {
