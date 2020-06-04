@@ -13,14 +13,16 @@ public:
 	threadsafe_stack() = default;
 	threadsafe_stack(const threadsafe_stack& other) {
 		//std::shared_lock sl(other._mutex);
-		std::lock_guard<my_mutex> lg(_mutex);
+		std::lock_guard<my_mutex> lg(other._mutex);
 		_data = other._data;
 	}
 	threadsafe_stack& operator=(const threadsafe_stack& other) {
 		if (this != &other) {
-			std::lock_guard<my_mutex> lg(_mutex, std::defer_lock);
-			std::lock_guard<my_mutex> sl(other._mutex, std::defer_lock);
-			std::lock(lg, sl);
+			//std::lock_guard lg(_mutex, std::defer_lock);
+			//std::shared_lock sl(other._mutex, std::defer_lock);
+			//std::lock(lg, sl);
+
+			std::scoped_lock<my_mutex> sl(_mutex, other._mutex);
 			_data = other._data;
 		}
 		return *this;
@@ -39,11 +41,13 @@ public:
 	~threadsafe_stack() = default;
 
 	bool empty() const {
+		//std::shared_lock sl(_mutex);
 		std::lock_guard<my_mutex> sl(_mutex);
 		return _data.empty();
 	}
 
 	size_t size() const {
+		//std::shared_lock sl(_mutex);
 		std::lock_guard<my_mutex> sl(_mutex);
 		return _data.size();
 	}
@@ -53,7 +57,7 @@ public:
 		if (_data.empty()) {
 			throw std::out_of_range("threadsafe_stack is empty!");
 		}
-		value = std::move(_data.back()); // if exception here -> no pop_back
+		value = std::move(_data.back());
 		_data.pop_back();
 	}
 
