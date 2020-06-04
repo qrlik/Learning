@@ -5,10 +5,10 @@ using namespace std;
 
 int main(int argc, char* argv[]) {
 	// Задание 1. std::future<>, std::promise<>
-	//Task_one();
+	Task_one();
 
 	// Задание 2. Реализация spinlock. std::atomic_flag
-	//TestThreadsafe_Stack();
+	TestThreadsafe_Stack();
 
 	//	Successful pops : 18
 	//	Threadsafe stack with shared mutex : 14554 ms
@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
 	//	Final count : 282 / 300
 
 	//Задание 3. Атомарные типы данных.
-	//Task_three();
+	Task_three();
 	//A_mutex: 1034 ms
 	//A_my_mutex : 1426 ms
 	//A_atomic : 47 ms
