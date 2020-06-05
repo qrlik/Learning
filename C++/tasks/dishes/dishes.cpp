@@ -256,9 +256,9 @@ void PrintResults(uint64_t cost, const unordered_map<string, MaxType>& packs,
 }
 
 void ComputeAndPrint(istream& is, ostream& os) {
-	auto dishes = ParseDishes(is); // out_of_range
-	auto prices = ParsePriceCatalog(is); // out_of_range
-	auto catalog = ParseIngredientCatalog(is); // out_of_range
+	auto dishes = ParseDishes(is); // out_of_range, invalid_argument
+	auto prices = ParsePriceCatalog(is); // out_of_range, invalid_argument
+	auto catalog = ParseIngredientCatalog(is); // out_of_range, invalid_argument
 
 	auto [ingredients_summary, dish_composition] = SumAllDishes(dishes, catalog, prices);
 	auto [packs, cost] = CalculatePacksAndCost(ingredients_summary, prices); // out_of_range
