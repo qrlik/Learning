@@ -243,7 +243,7 @@ auto CalculatePacksAndCost(const unordered_map<string, MaxType>& ingredients_sum
 	return pair{ move(packs_amount), cost };
 }
 
-void PrintResults(uint64_t cost, const unordered_map<string, MaxType>& packs,
+void PrintResults(MaxType cost, const unordered_map<string, MaxType>& packs,
 	const unordered_map<string, Composition>& dish_composition, ostream& out_stream) {
 	out_stream << cost;
 	for (const auto& [name, packs] : packs) {
