@@ -1,6 +1,5 @@
 #include <string>
 #include <string_view>
-#include <stdexcept>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
@@ -10,16 +9,14 @@ using namespace std;
 
 /* Parsers */
 template <typename Number>
-Number ReadNumberOnLine(std::istream& stream) {
-    Number number;
-    stream >> number;
-    string dummy;
-    getline(stream, dummy);
-    return number;
+Number ReadDishesAmount(std::istream& stream) {
+	Number number;
+	stream >> number;
+	stream.ignore(numeric_limits<streamsize>::max(), '\n');
+	return number;
 }
 
-int ConvertToInt(string_view str)
-{
+int ConvertToInt(string_view str) {
 	size_t pos;
 	const int result = stoi(string(str), &pos);
 	if (pos != str.length())
@@ -44,141 +41,82 @@ double ConvertToDouble(string_view str)
 	return result;
 }
 
-pair<string_view, optional<string_view>> SplitTwoStrict(string_view str, string_view delimiter = " ")
+string_view ReadPrefix(string_view& str, string_view delimiter = " ")
 {
+	string_view result;
 	const size_t pos = str.find(delimiter);
-	if (pos == str.npos)
-	{
-		return { str, nullopt };
+	if (pos == str.npos) {
+		result.swap(str);
+	} else {
+		result = str.substr(0, pos);
+		str.remove_prefix(pos + delimiter.length());
 	}
-	else
-	{
-		return { str.substr(0, pos), str.substr(pos + delimiter.length()) };
-	}
+	return result;
 }
 
-pair<string_view, string_view> SplitTwo(string_view str, string_view delimiter = " ")
-{
-	const auto [lhs, rhs_opt] = SplitTwoStrict(str, delimiter);
-	return { lhs, rhs_opt.value_or("") };
-}
-
-string_view ReadToken(string_view& str, string_view delimiter = " ")
-{
-	const auto [lhs, rhs] = SplitTwo(str, delimiter);
-	str = rhs;
-	return lhs;
-}
+using MaxType = uint64_t;
+// 10^3(блюда) * 10^2(кол-во ингредиентов) * 10^3(кол-во ингредиента) * 10^3(гр\мл)
+using ThsType = uint16_t; // для 1 <= x <= 1000
 
 /* number system */
-enum class N_S { 
-    G,
-	KG,
-    ML,
-	L,
-    CNT,
-	TENS
+const unordered_map<string_view, ThsType> STR_TO_FACTOR{
+	{"g", 1},
+	{"kg", 1000},
+	{"ml", 1},
+	{"l", 1000},
+	{"cnt", 1},
+	{"tens", 10},
 };
-
-const unordered_map<string_view, N_S> STR_TO_SYSTEM{
-	{"g", N_S::G},
-	{"kg", N_S::KG},
-	{"ml", N_S::ML},
-	{"l", N_S::L},
-	{"cnt", N_S::CNT},
-	{"tens", N_S::TENS},
-};
-
-struct Unit {
-	N_S system;
-	uint16_t amount;
-};
-
-Unit ConvertToUnit(string_view str) {
-	if (const auto it = STR_TO_SYSTEM.find(str);
-		it != STR_TO_SYSTEM.end()) {
-		N_S system = it->second;
-		uint16_t amount = (system == N_S::G || system == N_S::ML || system == N_S::CNT) ? 1 : 1000;
-		amount = (system == N_S::TENS) ? 10 : amount;
-		return Unit{ system, amount };
-	}
-	else { /* or std::optional */
-		ostringstream error;
-		error << "Wrong Unit format in \'" << str << "\'";
-		throw invalid_argument(error.str());
-	}
-}
 
 struct Ingredient {
-    string _name;
-	Unit _unit;
-	bool operator==(const Ingredient& rhs) const {
-		return _name == rhs._name;
-	}
+	string _name;
+	ThsType _amount{};
+	ThsType _factor{};
 };
 
-struct IngredientHasher {
-	size_t operator()(const Ingredient& i) const {
-		return shash(i._name);
-	}
-	hash<string> shash;
-};
-
-using Ingredients = unordered_map<Ingredient, size_t, IngredientHasher>;
-
-class Dish {
-    string _name;
-	Ingredients _ingredients;
-	size_t _tasters;
-public:
-	Dish(string n, Ingredients i, size_t t) :
-		_name(move(n)), _ingredients(move(i)), _tasters(t) {}
-	const Ingredients& getIngredients() const {
-		return _ingredients;
-	}
-	size_t getTasters() const {
-		return _tasters;
-	}
-	const string& getName() const {
-		return _name;
-	}
+struct Dish {
+	string _name;
+	vector<Ingredient> _ingredients;
+	ThsType _tasters_amount{};
 };
 
 /* Parsing ingredient */
-Ingredients::value_type ParseIngredient(string_view ingredient_info) {
-	string name = string(ReadToken(ingredient_info));
-	size_t amount = static_cast<size_t>((ConvertToInt(ReadToken(ingredient_info))));
-	Unit unit = ConvertToUnit(ingredient_info);
-	return pair(Ingredient{ name, unit }, amount);
+auto ParseIngredient(string_view ingredient_info) {
+	Ingredient result;
+	result._name = ReadPrefix(ingredient_info);
+	result._amount = static_cast<ThsType>(ConvertToInt(ReadPrefix(ingredient_info)));
+	result._factor = STR_TO_FACTOR.at(ingredient_info);
+	return result;
 }
 
-Ingredients ParseIngredients(size_t count, istream& in_stream) {
-	Ingredients ingredients;
+auto ParseIngredients(int count, istream& in_stream) {
+	vector<Ingredient> ingredients;
+	ingredients.reserve(count);
+
 	string ingredient_info;
-	for (size_t i = 0; i < count && getline(in_stream, ingredient_info); ++i) {
-		ingredients.insert(ParseIngredient(ingredient_info));
+	for (decltype(count) i = 0; i < count && getline(in_stream, ingredient_info); ++i) {
+		ingredients.push_back(ParseIngredient(ingredient_info));
 	}
 	return ingredients;
 }
 
 /* Parsing dish */
-Dish ParseDish(string_view dish_info, istream& in_stream) {
-	string name = string(ReadToken(dish_info));
-	size_t tasters = static_cast<size_t>(ConvertToInt(ReadToken(dish_info)));
-	size_t ingredients_count = static_cast<size_t>(ConvertToInt(dish_info));
-	Ingredients ingredients = ParseIngredients(ingredients_count, in_stream);
+auto ParseDish(string_view dish_info, istream& in_stream) {
+	Dish result;
+	result._name = ReadPrefix(dish_info);
+	result._tasters_amount = static_cast<ThsType>(ConvertToInt(ReadPrefix(dish_info)));
+	result._ingredients = ParseIngredients(ConvertToInt(dish_info), in_stream);
 
-	return Dish(move(name), move(ingredients), tasters);
+	return result;
 }
 
-vector<Dish> ParseDishes(istream& in_stream = cin) {
-	const size_t count = ReadNumberOnLine<size_t>(in_stream);
-
+auto ParseDishes(istream& in_stream) {
+	const auto dishes_amount = ReadDishesAmount<ThsType>(in_stream);
 	vector<Dish> dishes;
-	dishes.reserve(count);
+	dishes.reserve(dishes_amount);
 
 	string dish_info;
-	for (size_t i = 0; i < count && getline(in_stream, dish_info); ++i) {
+	for (ThsType i = 0; i < dishes_amount && getline(in_stream, dish_info); ++i) {
 		dishes.push_back(ParseDish(dish_info, in_stream));
 	}
 	return dishes;
@@ -186,26 +124,27 @@ vector<Dish> ParseDishes(istream& in_stream = cin) {
 
 /* Parsing price catalog */
 struct IngredientPrice {
-	uint16_t _price;
-	uint16_t _amount;
-	Unit _unit;
+	ThsType _price{};
+	ThsType _pack_amount{};
+	ThsType _factor{};
 };
 using PriceCatalog = unordered_map<string, IngredientPrice>;
 
-PriceCatalog::value_type ParseIngredientPrice(string_view ingredient_info) {
-	string name = string(ReadToken(ingredient_info));
-	uint16_t price = static_cast<uint16_t>(ConvertToInt(ReadToken(ingredient_info)));
-	uint16_t amount = static_cast<uint16_t>(ConvertToInt(ReadToken(ingredient_info)));
-	Unit unit = ConvertToUnit(ingredient_info);
-	return pair(move(name), IngredientPrice{ price, amount, unit });
+auto ParseIngredientPrice(string_view ingredient_info) {
+	PriceCatalog::value_type result(ReadPrefix(ingredient_info), IngredientPrice{});
+	auto& ing_price = result.second;
+	ing_price._price= static_cast<ThsType>(ConvertToInt(ReadPrefix(ingredient_info)));
+	ing_price._pack_amount = static_cast<ThsType>(ConvertToInt(ReadPrefix(ingredient_info)));
+	ing_price._factor = STR_TO_FACTOR.at(ingredient_info);
+	return result;
 }
 
-PriceCatalog ParsePriceCatalog(istream& in_stream = cin) {
-	const size_t count = ReadNumberOnLine<size_t>(in_stream);
+PriceCatalog ParsePriceCatalog(istream& in_stream) {
+	const auto prices_amount = ReadDishesAmount<ThsType>(in_stream);
 
 	PriceCatalog catalog;
 	string price_info;
-	for (size_t i = 0; i < count && getline(in_stream, price_info); ++i) {
+	for (ThsType i = 0; i < prices_amount && getline(in_stream, price_info); ++i) {
 		catalog.insert(ParseIngredientPrice(price_info));
 	}
 	return catalog;
@@ -213,15 +152,15 @@ PriceCatalog ParsePriceCatalog(istream& in_stream = cin) {
 
 /* Parsing ingredient catalog */
 struct Composition {
-	double _protein;
-	double _fat; /*no bounds*/
-	double _carbo;  /* (-~ ; 1000] */
-	double _energy;
+	double _protein{}; // белки
+	double _fat{}; // жиры
+	double _carbo{};  // углеводы
+	double _energy{}; // эн. ценность
 	Composition operator*(double factor) const {
 		return { _protein * factor, _fat * factor,
 		_carbo * factor, _energy * factor };
 	}
-	const Composition& operator +=(const Composition& other) {
+	Composition& operator +=(const Composition& other) {
 		_protein += other._protein;
 		_fat += other._fat;
 		_carbo += other._carbo;
@@ -232,99 +171,99 @@ struct Composition {
 
 struct IngredientData {
 	Composition _composition;
-	Unit _unit;
-	uint16_t _amount;
+	ThsType _amount{};
+	ThsType _factor{};
 };
 using IngredientCatalog = unordered_map<string, IngredientData>;
 
-IngredientCatalog::value_type ParseIngredientData(string_view ingredient_info) {
-	string name = string(ReadToken(ingredient_info));
-	uint16_t amount = static_cast<uint16_t>(ConvertToInt(ReadToken(ingredient_info)));
-	Unit unit = ConvertToUnit(ReadToken(ingredient_info));
+auto ParseIngredientData(string_view ingredient_info) {
+	IngredientCatalog::value_type result(ReadPrefix(ingredient_info), IngredientData{});
+	auto& [composition, amount, factor] = result.second;
 
-	Composition composition{};
-	composition._protein = ConvertToDouble(ReadToken(ingredient_info));
-	composition._fat = ConvertToDouble(ReadToken(ingredient_info));
-	composition._carbo = ConvertToDouble(ReadToken(ingredient_info));
+	amount = static_cast<ThsType>(ConvertToInt(ReadPrefix(ingredient_info)));
+	factor = STR_TO_FACTOR.at(ReadPrefix(ingredient_info));
+
+	composition._protein = ConvertToDouble(ReadPrefix(ingredient_info));
+	composition._fat = ConvertToDouble(ReadPrefix(ingredient_info));
+	composition._carbo = ConvertToDouble(ReadPrefix(ingredient_info));
 	composition._energy = ConvertToDouble(ingredient_info);
 
-	return pair(move(name), IngredientData{ composition, unit, amount });
+	return result;
 }
 
-IngredientCatalog ParseIngredientCatalog(istream& in_stream = cin) {
-	const size_t count = ReadNumberOnLine<size_t>(in_stream);
+IngredientCatalog ParseIngredientCatalog(istream& in_stream) {
+	const auto ing_amount = ReadDishesAmount<ThsType>(in_stream);
 
 	IngredientCatalog catalog;
 	string data_info;
-	for (size_t i = 0; i < count && getline(in_stream, data_info); ++i) {
+	for (ThsType i = 0; i < ing_amount && getline(in_stream, data_info); ++i) {
 		catalog.insert(ParseIngredientData(data_info));
 	}
 	return catalog;
 }
 
-using DishComposition = unordered_map<string, Composition>;
-
 /* суммируем все ингредиенты необходимые для блюд */
-pair<Ingredients, DishComposition> SumAllDishes(const vector<Dish>& dishes,
+auto SumAllDishes(const vector<Dish>& dishes,
 	const IngredientCatalog& catalog, const PriceCatalog& prices) {
-	Ingredients summary; // общее количество ингредиентов
-	DishComposition dishes_composition;
+	unordered_map<string, Composition> dishes_composition;
+	unordered_map<string, MaxType> summary; // общее количество ингредиентов
+	for (const auto& ing : prices) {
+		summary.emplace(ing.first, 0);
+	}
 
 	for (const auto& dish : dishes) {
-		Composition& dish_composition = dishes_composition[dish.getName()];
-		for (const auto& ingredient : dish.getIngredients()) {
-			summary[ingredient.first] += dish.getTasters() * ingredient.second;
+		auto& composition = dishes_composition[dish._name];
+		for (const auto& ingredient : dish._ingredients) {
+			auto ing_amount = ingredient._amount * ingredient._factor; // количество в блюде
+			summary[ingredient._name] += static_cast<MaxType>(dish._tasters_amount) * ing_amount; // необходимо всего
 
-			const IngredientData& ing_data = catalog.at(ingredient.first._name);
-			const size_t amount = ingredient.second * ingredient.first._unit.amount; // необходимое количество
-			const size_t catalog_amount = ing_data._amount * ing_data._unit.amount; // количество в каталоге
-			const double factor = static_cast<double>(amount) / catalog_amount;
-			dish_composition += ing_data._composition * factor;
-		}
-	}
-	Ingredient tmp{};
-	for (const auto& ingredient : prices) {
-		tmp = { ingredient.first, ingredient.second._unit };
-		if (auto it = summary.find(tmp); it == summary.end()) {
-			summary.insert({ move(tmp), 0 });
+			const auto& ing_data = catalog.at(ingredient._name);
+			const double factor = ing_amount / (static_cast<double>(ing_data._amount) * ing_data._factor);
+			composition += ing_data._composition * factor;
 		}
 	}
 
-	return { move(summary), move(dishes_composition) };
+	return pair{ move(summary), move(dishes_composition) };
 }
 
-pair<Ingredients, size_t> CalculateValues(const Ingredients& ingredients, const PriceCatalog& prices) {
-	Ingredients packing_count;
-	size_t summ_price = 0;
+auto CalculatePacksAndCost(const unordered_map<string, MaxType>& ingredients_summary, const PriceCatalog& prices) {
+	decay_t<decltype(ingredients_summary)> packs_amount;
+	MaxType cost = 0;
 
-	for (const auto& ingredient : ingredients) {
-		const string& name = ingredient.first._name;
-		const IngredientPrice& price = prices.at(name);
+	for (const auto& [name, amount] : ingredients_summary) {
+		const auto& ing_price = prices.at(name);
 
-		const size_t amount = ingredient.second * ingredient.first._unit.amount; // необходимое количество
-		const size_t one_package = price._amount * price._unit.amount; // одна упаковка
-		const size_t pack_count = [=]() {
-			bool is_not_full_pack = (amount % one_package) ? 1 : 0;
-			return amount / one_package + is_not_full_pack;
-		}();
-
-		packing_count[ingredient.first] = pack_count;
-		summ_price += pack_count * price._price;
+		const auto one_package = ing_price._pack_amount * ing_price._factor; // одна упаковка
+		const bool is_not_full_pack = (amount % one_package) ? 1 : 0;
+		auto packs = amount / one_package + is_not_full_pack;
+		packs_amount[name] = packs;
+		cost += packs * ing_price._price;
 	}
 
-	return { move(packing_count), summ_price };
+	return pair{ move(packs_amount), cost };
 }
 
-void PrintResults(size_t check, const Ingredients& packeges, const DishComposition& compositions, ostream& os_stream = cout) {
-	os_stream << check;
-	for (const auto& ingredient_packages : packeges) {
-		os_stream << '\n' << ingredient_packages.first._name << " " << ingredient_packages.second;
+void PrintResults(uint64_t cost, const unordered_map<string, MaxType>& packs,
+	const unordered_map<string, Composition>& dish_composition, ostream& out_stream) {
+	out_stream << cost;
+	for (const auto& [name, packs] : packs) {
+		out_stream << '\n' << name << " " << packs;
 	}
-	for (const auto& dish_composition : compositions) {
-		const Composition& comp = dish_composition.second;
-		os_stream << '\n' << dish_composition.first << " " << comp._protein << " " <<
-			comp._fat << " " << comp._carbo << " " << comp._energy;
+	for (const auto& [name, composition] : dish_composition) {
+		out_stream << '\n' << name << " " << composition._protein << " " <<
+			composition._fat << " " << composition._carbo << " " << composition._energy;
 	}
+}
+
+void ComputeAndPrint(istream& is, ostream& os) {
+	auto dishes = ParseDishes(is); // out_of_range
+	auto prices = ParsePriceCatalog(is); // out_of_range
+	auto catalog = ParseIngredientCatalog(is); // out_of_range
+
+	auto [ingredients_summary, dish_composition] = SumAllDishes(dishes, catalog, prices);
+	auto [packs, cost] = CalculatePacksAndCost(ingredients_summary, prices); // out_of_range
+
+	PrintResults(cost, packs, dish_composition, os);
 }
 //
 //#include "test_runner.h"
@@ -358,25 +297,18 @@ void PrintResults(size_t check, const Ingredients& packeges, const DishCompositi
 //		"butter 100 g 0.8 72.5 1.3 661\n"
 //	);
 //
-//	vector<Dish> dishes = ParseDishes(input);
-//	PriceCatalog prices = ParsePriceCatalog(input);
-//	IngredientCatalog catalog = ParseIngredientCatalog(input);
-//
-//	auto [ingredients, composition] = SumAllDishes(dishes, catalog, prices);
-//	auto [packages, check] = CalculateValues(ingredients, prices);
-//
 //	ostringstream output;
-//	PrintResults(check, packages, composition, output);
+//	ComputeAndPrint(input, output);
 //	ASSERT_EQUAL(output.str(), "734\n"
 //		"egg 4\n"
 //		"milk 2\n"
+//		"toasted_bread 1\n"
 //		"sausage 2\n"
 //		"butter 1\n"
 //		"cream 0\n"
 //		"salt 1\n"
-//		"toasted_bread 1\n"
-//		"sandwich 6.00 13.29 21.50 228.3\n"
-//		"omelet 57.360 57.540 5.314 177.800\n"
+//		"sandwich 6 13.29 21.5 228.3\n"
+//		"omelet 57.36 57.54 5.314 177.8"
 //	);
 //}
 //
@@ -385,17 +317,8 @@ void PrintResults(size_t check, const Ingredients& packeges, const DishCompositi
 //	RUN_TEST(tr, Test);
 //}
 
-int main()
-{
+int main() {
 	//TestAll();
-
-	vector<Dish> dishes = ParseDishes();
-	PriceCatalog prices = ParsePriceCatalog();
-	IngredientCatalog catalog = ParseIngredientCatalog();
-
-	auto [ingredients, composition] = SumAllDishes(dishes, catalog, prices);
-	auto [packages, check] = CalculateValues(ingredients, prices);
-
-	PrintResults(check, packages, composition);
-    return 0;
+	ComputeAndPrint(cin, cout);
+	return 0;
 }
